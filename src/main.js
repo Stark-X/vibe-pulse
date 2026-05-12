@@ -132,10 +132,6 @@ function buildAgentList(agents) {
 }
 
 function buildAgentRow(agent) {
-  if (agent.pending_permission) {
-    return buildPermissionRow(agent);
-  }
-
   const indicatorCls = agent.status === 'running' ? 'working' : 'done';
   const canJump = !!agent.window_address;
   const title = agent.session_name ? `${agent.name} · ${agent.session_name}` : agent.name;
@@ -156,65 +152,6 @@ function buildAgentRow(agent) {
     buildIcon(agent.tool_type),
     canJump ? null : h('span', { className: 'age', style: { color: 'var(--text-3)' } }, '—'),
   );
-}
-
-function buildPermissionRow(agent) {
-  const req = agent.pending_permission;
-  const title = agent.session_name ? `${agent.name} · ${agent.session_name}` : agent.name;
-
-  // input arrives as a JS object (serialized from serde_json::Value)
-  const inp = req.input || {};
-  const displayInput = inp.command || inp.path || inp.explanation
-    || (typeof inp === 'object' ? JSON.stringify(inp, null, 2) : String(inp));
-
-  const row = h('div', { className: 'perm-row' },
-    h('div', { className: 'perm-head' },
-      h('span', { className: 'warn-icon' }, '!'),
-      h('span', { style: { fontWeight: 600, color: 'var(--text-1)', flex: 1 } }, title),
-      h('span', { className: 'perm-tool mono' }, req.tool_name),
-    ),
-    req.description ? h('div', { className: 'perm-desc' }, req.description) : null,
-    h('pre', { className: 'perm-input' }, displayInput),
-    h('div', { className: 'actions' },
-      h('button', { className: 'btn primary',    onClick: () => respondPermission(req.session_id, 'approve') }, 'Approve'),
-      h('button', { className: 'btn approve-all', onClick: () => respondPermission(req.session_id, 'approve', true) }, 'All'),
-      h('button', { className: 'btn danger',     onClick: () => respondPermission(req.session_id, 'block') }, 'Deny'),
-      h('button', { className: 'btn',            onClick: () => toggleDenyInput(row, req.session_id) }, 'Deny+'),
-    ),
-  );
-  return row;
-}
-
-function toggleDenyInput(row, sessionId) {
-  const existing = row.querySelector('.perm-deny-wrap');
-  if (existing) { existing.remove(); return; }
-
-  const input = h('input', { className: 'perm-deny-input', type: 'text', placeholder: 'Reason…' });
-  const confirm = h('button', { className: 'btn danger', style: { marginLeft: 6 },
-    onClick: () => respondPermission(sessionId, 'block', false, input.value.trim() || null)
-  }, 'Send');
-  const wrap = h('div', { className: 'perm-deny-wrap', style: { display: 'flex', marginTop: 6 } }, input, confirm);
-  row.append(wrap);
-  input.focus();
-}
-
-async function respondPermission(sessionId, decision, approveAll = false, feedback = null) {
-  try {
-    await invoke('respond_permission', {
-      session_id: sessionId,
-      decision,
-      approve_all: approveAll || null,
-      feedback,
-    });
-    const agent = st.agents.find(a => a.session_id === sessionId);
-    if (agent) {
-      agent.pending_permission = null;
-      render();
-      resizeWindow();
-    }
-  } catch (e) {
-    toast(`Permission response failed: ${e}`);
-  }
 }
 
 // ============ Jump ============

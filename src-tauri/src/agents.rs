@@ -61,9 +61,9 @@ pub fn scan(sys: &mut System) -> Vec<AgentInfo> {
                 cwd,
                 session_id: None,
                 session_name: None,
+                session_busy: true,
                 current_step: None,
                 window_address: None,
-                pending_permission: None,
             });
         }
     }
@@ -71,53 +71,18 @@ pub fn scan(sys: &mut System) -> Vec<AgentInfo> {
     dedup_to_roots(&mut agents);
     agents.sort_by_key(|a| a.pid);
 
-    // Enrich Claude Code agents after dedup (avoid reads on discarded processes)
+    // Enrich Claude Code agents after dedup
     for agent in &mut agents {
         if agent.tool_type == "Claude Code" {
-            let (sid, sname, step) = claude_metadata(agent.pid, &agent.cwd);
+            let (sid, busy, sname, step) = claude_metadata(agent.pid, &agent.cwd);
             agent.session_id = sid;
+            agent.session_busy = busy;
             agent.session_name = sname;
             agent.current_step = step;
         }
     }
 
-    check_pending_permissions(&mut agents);
-
     agents
-}
-
-fn check_pending_permissions(agents: &mut [AgentInfo]) {
-    let Ok(home) = std::env::var("HOME") else { return };
-    let pending_dir = std::path::Path::new(&home).join(".claude/pulse/pending");
-    let Ok(entries) = std::fs::read_dir(&pending_dir) else { return };
-
-    let now_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0);
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|s| s.to_str()) != Some("json") { continue; }
-
-        let Ok(raw) = std::fs::read_to_string(&path) else { continue };
-        let Ok(req) = serde_json::from_str::<crate::state::PermissionRequest>(&raw) else {
-            // Unreadable/malformed → clean up
-            let _ = std::fs::remove_file(&path);
-            continue;
-        };
-
-        // Remove stale entries: older than 45 seconds
-        let age_ms = req.created_at_ms.map(|c| now_ms.saturating_sub(c)).unwrap_or(0);
-        if age_ms > 45_000 {
-            let _ = std::fs::remove_file(&path);
-            continue;
-        }
-
-        if let Some(agent) = agents.iter_mut().find(|a| a.session_id.as_deref() == Some(&req.session_id)) {
-            agent.pending_permission = Some(req);
-        }
-    }
 }
 
 // ── Claude Code session + transcript ────────────────────────────────────────
@@ -128,16 +93,19 @@ struct ClaudeSession {
     session_id: Option<String>,
     name: Option<String>,
     cwd: Option<String>,
+    status: Option<String>,  // "idle" | "busy"
 }
 
-fn claude_metadata(pid: u32, proc_cwd: &str) -> (Option<String>, Option<String>, Option<String>) {
-    let Ok(home) = std::env::var("HOME") else { return (None, None, None) };
+// Returns (session_id, is_busy, session_name, current_step)
+fn claude_metadata(pid: u32, proc_cwd: &str) -> (Option<String>, bool, Option<String>, Option<String>) {
+    let Ok(home) = std::env::var("HOME") else { return (None, true, None, None) };
 
     let session_path = format!("{}/.claude/sessions/{}.json", home, pid);
-    let Ok(raw) = std::fs::read_to_string(session_path) else { return (None, None, None) };
-    let Ok(session) = serde_json::from_str::<ClaudeSession>(&raw) else { return (None, None, None) };
+    let Ok(raw) = std::fs::read_to_string(session_path) else { return (None, true, None, None) };
+    let Ok(session) = serde_json::from_str::<ClaudeSession>(&raw) else { return (None, true, None, None) };
 
     let session_id = session.session_id.clone();
+    let is_busy = session.status.as_deref() != Some("idle");
     let session_name = session.name.filter(|s| !s.is_empty());
 
     let step = session_id.as_deref().and_then(|sid| {
@@ -147,7 +115,7 @@ fn claude_metadata(pid: u32, proc_cwd: &str) -> (Option<String>, Option<String>,
         current_step_from_transcript(&transcript)
     });
 
-    (session_id, session_name, step)
+    (session_id, is_busy, session_name, step)
 }
 
 fn current_step_from_transcript(path: &str) -> Option<String> {
