@@ -2,8 +2,10 @@ import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { register as registerShortcut } from '@tauri-apps/plugin-global-shortcut';
 
+const CLAUDE_ICON_URL = 'https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-png/dark/claudecode-color.png';
+
 const AGENT_ICON = {
-  'Claude Code': { color: 'var(--peach)',  glyph: 'C' },
+  'Claude Code': { img: CLAUDE_ICON_URL },
   'Codex':       { color: 'var(--sky)',    glyph: 'X' },
   'Gemini CLI':  { color: 'var(--violet)', glyph: 'G' },
   'Cursor':      { color: 'var(--green)',  glyph: '>' },
@@ -45,17 +47,17 @@ function h(tag, attrs, ...children) {
   return el;
 }
 
-function iconCfg(tool) {
-  return AGENT_ICON[tool] || { color: 'var(--text-2)', glyph: '·' };
-}
-
 function buildIcon(tool) {
-  const c = iconCfg(tool);
+  const c = AGENT_ICON[tool];
+  if (c?.img) {
+    return h('img', { className: 'agent-icon-img', src: c.img, alt: tool });
+  }
+  const g = c || { color: 'var(--text-2)', glyph: '·' };
   return h('div', { className: 'agent-icon', style: {
-    background: `color-mix(in oklch, ${c.color} 18%, var(--bg-3))`,
-    border: `1px solid color-mix(in oklch, ${c.color} 45%, var(--border))`,
-    color: c.color,
-  } }, c.glyph);
+    background: `color-mix(in oklch, ${g.color} 18%, var(--bg-3))`,
+    border: `1px solid color-mix(in oklch, ${g.color} 45%, var(--border))`,
+    color: g.color,
+  } }, g.glyph);
 }
 
 // ============ Render ============
@@ -132,6 +134,10 @@ function buildAgentList(agents) {
 function buildAgentRow(agent) {
   const indicatorCls = agent.status === 'running' ? 'working' : 'done';
   const canJump = !!agent.window_address;
+  const title = agent.session_name ? `${agent.name} · ${agent.session_name}` : agent.name;
+  const whereEl = agent.current_step
+    ? h('div', { className: 'where', title: agent.current_step }, agent.current_step)
+    : null;
 
   return h('button', {
     className: 'agent-row',
@@ -140,8 +146,8 @@ function buildAgentRow(agent) {
   },
     h('span', { className: `indicator ${indicatorCls}` }),
     h('div', { style: { minWidth: 0 } },
-      h('div', { className: 'name' }, agent.name),
-      h('div', { className: 'where' }, agent.tool_type),
+      h('div', { className: 'name' }, title),
+      whereEl,
     ),
     buildIcon(agent.tool_type),
     canJump ? null : h('span', { className: 'age', style: { color: 'var(--text-3)' } }, '—'),
@@ -275,7 +281,7 @@ function updateClock() {
   const mm = d.getMinutes().toString().padStart(2, '0');
   const day = d.toLocaleDateString('en', { weekday: 'short' }).toLowerCase();
   st.clock = `${hh}:${mm} · ${day}`;
-  if (st.agents.length === 0) render();
+  render();
 }
 
 // ============ Init ============
@@ -288,7 +294,7 @@ async function init() {
   updateClock();
   render();
   buildSettings();
-  setInterval(updateClock, 30000);
+  setInterval(updateClock, 10000);
 
   await startPolling();
   await registerShortcuts();

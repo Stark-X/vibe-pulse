@@ -9,11 +9,13 @@ pub enum AgentStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AgentInfo {
-    pub name: String,
+    pub name: String,                     // cwd basename only
     pub tool_type: String,
     pub pid: u32,
     pub status: AgentStatus,
     pub cwd: String,
+    pub session_name: Option<String>,     // from ~/.claude/sessions/<pid>.json "name"
+    pub current_step: Option<String>,     // last tool_use from transcript
     pub window_address: Option<String>,
 }
 
