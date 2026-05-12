@@ -31,6 +31,20 @@ fn main() {
             let handle = app.handle().clone();
             let state = agent_state.clone();
 
+            // Tell Hyprland not to draw a border or give focus to the Pulse overlay.
+            // Uses `hyprctl keyword` so no permanent hyprland.conf edit is needed.
+            if hyprland::available() {
+                for rule in &[
+                    "windowrulev2 noborder,class:^(Pulse|pulse)$",
+                    "windowrulev2 nofocus,class:^(Pulse|pulse)$",
+                ] {
+                    let parts: Vec<&str> = rule.splitn(2, ' ').collect();
+                    let _ = std::process::Command::new("hyprctl")
+                        .args(["keyword", parts[0], parts[1]])
+                        .output();
+                }
+            }
+
             std::thread::spawn(move || {
                 let mut last_hash = String::new();
 

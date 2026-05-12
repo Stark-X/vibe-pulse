@@ -1,12 +1,12 @@
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { register as registerShortcut } from '@tauri-apps/plugin-global-shortcut';
-
-const CLAUDE_ICON_URL = 'https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-png/dark/claudecode-color.png';
+import claudeCodeIcon from './assets/claude-code.png';
+import codexIcon from './assets/codex.png';
 
 const AGENT_ICON = {
-  'Claude Code': { img: CLAUDE_ICON_URL },
-  'Codex':       { color: 'var(--sky)',    glyph: 'X' },
+  'Claude Code': { img: claudeCodeIcon },
+  'Codex':       { img: codexIcon },
   'Gemini CLI':  { color: 'var(--violet)', glyph: 'G' },
   'Cursor':      { color: 'var(--green)',  glyph: '>' },
   'OpenCode':    { color: 'var(--coral)',  glyph: 'O' },
@@ -214,10 +214,12 @@ async function resizeWindow() {
   try {
     const pulse = document.querySelector('.pulse');
     if (!pulse) return;
-    const rect = pulse.getBoundingClientRect();
+    await new Promise(r => requestAnimationFrame(r));
     const pad = 16;
-    const w = Math.ceil(rect.width) + pad * 2;
-    const ht = Math.ceil(rect.height) + pad * 2;
+    // scrollHeight gives the full content height even when the window clips it,
+    // avoiding the chicken-and-egg problem with getBoundingClientRect().
+    const w = Math.ceil(pulse.getBoundingClientRect().width) + pad * 2;
+    const ht = Math.ceil(pulse.scrollHeight) + pad * 2;
     await getCurrentWindow().setSize(new LogicalSize(w, ht));
   } catch (_) {}
 }
@@ -279,7 +281,7 @@ function updateClock() {
   const d = new Date();
   const hh = d.getHours().toString().padStart(2, '0');
   const mm = d.getMinutes().toString().padStart(2, '0');
-  const day = d.toLocaleDateString('en', { weekday: 'short' }).toLowerCase();
+  const day = d.toLocaleDateString('en', { weekday: 'short' }).toUpperCase();
   st.clock = `${hh}:${mm} · ${day}`;
   render();
 }
