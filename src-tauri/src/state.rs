@@ -8,15 +8,30 @@ pub enum AgentStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PermissionRequest {
+    pub session_id: String,
+    pub tool_name: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    pub input: serde_json::Value,
+    #[serde(default)]
+    pub created_at_ms: Option<u64>,
+    #[serde(default)]
+    pub expires_at_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AgentInfo {
     pub name: String,                     // cwd basename only
     pub tool_type: String,
     pub pid: u32,
     pub status: AgentStatus,
     pub cwd: String,
+    pub session_id: Option<String>,
     pub session_name: Option<String>,     // from ~/.claude/sessions/<pid>.json "name"
     pub current_step: Option<String>,     // last tool_use from transcript
     pub window_address: Option<String>,
+    pub pending_permission: Option<PermissionRequest>,
 }
 
 #[allow(dead_code)]
