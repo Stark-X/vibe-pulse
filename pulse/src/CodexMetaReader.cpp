@@ -115,6 +115,12 @@ CodexMeta CodexMetaReader::read(quint32 pid, QStringList *watchPaths)
     if (!m.sessionId.isEmpty())
         m.sessionName = readSessionName(m.sessionId, watchPaths);
 
+    // Scan lines in order; track last function_call command and whether a
+    // task_complete arrived after it (Codex finished turn / asking question).
+    QString lastCmd;
+    QString lastAgentMsg;
+    bool taskCompletedAfterCmd = false;
+
     for (const QByteArray &raw : tail.split('\n')) {
         const QByteArray line = raw.trimmed();
         if (line.isEmpty()) continue;
@@ -128,13 +134,29 @@ CodexMeta CodexMetaReader::read(quint32 pid, QStringList *watchPaths)
             continue;
 
         const QJsonObject payload = obj.value(QStringLiteral("payload")).toObject();
-        if (payload.value(QStringLiteral("type")).toString() != QStringLiteral("function_call"))
-            continue;
+        const QString ptype = payload.value(QStringLiteral("type")).toString();
 
-        const QString step = summarise(payload);
-        if (!step.isEmpty())
-            m.currentStep = step;  // keep last one found
+        if (ptype == QStringLiteral("function_call")) {
+            const QString step = summarise(payload);
+            if (!step.isEmpty()) {
+                lastCmd = step;
+                taskCompletedAfterCmd = false;
+            }
+        } else if (ptype == QStringLiteral("task_complete")) {
+            // Turn finished — capture what Codex said (may be a question)
+            const QString msg = payload.value(QStringLiteral("last_agent_message")).toString();
+            lastAgentMsg = msg.section(QLatin1Char('\n'), 0, 0).left(100);
+            taskCompletedAfterCmd = true;
+        }
     }
+
+    // If the turn completed after the last command, Codex is now waiting for
+    // user input (idle or asking a question).  Show the agent's last message
+    // so the user can see what Codex said/asked, otherwise show the last command.
+    if (taskCompletedAfterCmd)
+        m.currentStep = lastAgentMsg;
+    else
+        m.currentStep = lastCmd;
 
     return m;
 }
