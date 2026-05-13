@@ -8,7 +8,11 @@ Window {
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
 
     width:  440
-    height: Math.min(600, Math.max(90, agentList.count * 66 + 56))
+    height: Math.min(maxContentHeight, Math.max(90, agentList.contentHeight + 57))
+
+    readonly property int maxContentHeight: 321
+    readonly property int contentHeight: agentList.contentHeight + 57
+    readonly property bool listClipped: contentHeight > maxContentHeight
 
     // ── theme ─────────────────────────────────────────────────────────────────
     QtObject {
@@ -125,7 +129,7 @@ Window {
         // ── agent list ────────────────────────────────────────────────────────
         ListView {
             id: agentList
-            anchors { top: headerDivider.bottom; topMargin: 4; left: parent.left; right: parent.right; bottom: parent.bottom; bottomMargin: 8 }
+            anchors { top: headerDivider.bottom; topMargin: 4; left: parent.left; right: parent.right; bottom: parent.bottom; bottomMargin: root.listClipped ? 0 : 8 }
             clip:  true
             model: agentModel
 
@@ -267,6 +271,35 @@ Window {
                     color: theme.textMuted
                     font.pixelSize: 13
                 }
+            }
+        }
+
+        // ── clipped indicator ─────────────────────────────────────────────────
+        Item {
+            visible: root.listClipped
+            z: 1
+            anchors { bottom: parent.bottom; left: parent.left; right: parent.right }
+            height: 72
+
+            // fade gradient
+            Rectangle {
+                anchors.fill: parent
+                anchors.bottomMargin: 0
+                radius: theme.radius
+                gradient: Gradient {
+                    GradientStop { position: 0.3; color: Qt.rgba(theme.bg.r, theme.bg.g, theme.bg.b, 0.0) }
+                    GradientStop { position: 0.7; color: Qt.rgba(theme.bg.r, theme.bg.g, theme.bg.b, 0.92) }
+                    GradientStop { position: 1.0; color: Qt.rgba(theme.bg.r, theme.bg.g, theme.bg.b, 1.0) }
+                }
+            }
+
+            Text {
+                anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: 10 }
+                text: "↓  " + Math.ceil((agentList.contentHeight - agentList.height) / 66) + " more hidden"
+                font.pixelSize: 10
+                font.letterSpacing: 0.5
+                font.weight: Font.Medium
+                color: theme.textMuted
             }
         }
     }
