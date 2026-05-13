@@ -148,6 +148,26 @@ int main(int argc, char **argv)
     component.completeCreate();
     window->show();
 
+    // After first frame, find our own window address and track height changes
+    if (HyprlandClient::available()) {
+        auto *selfAddr = new QString();
+        QTimer::singleShot(500, window, [selfAddr, window]() {
+            const auto wins = HyprlandClient::clients();
+            *selfAddr = HyprlandClient::findWindowAddress(
+                static_cast<quint32>(QCoreApplication::applicationPid()), wins);
+        });
+        auto *resizeTimer = new QTimer(window);
+        resizeTimer->setSingleShot(true);
+        resizeTimer->setInterval(50);
+        QObject::connect(window, &QWindow::heightChanged, resizeTimer, [resizeTimer]() {
+            resizeTimer->start();
+        });
+        QObject::connect(resizeTimer, &QTimer::timeout, window, [selfAddr, window]() {
+            if (!selfAddr->isEmpty())
+                HyprlandClient::resizeWindow(*selfAddr, window->width(), qMin(window->height(), 600));
+        });
+    }
+
     // ── IPC socket ────────────────────────────────────────────────────────────
     const QString socketPath =
         QStringLiteral("/tmp/pulse-%1.sock").arg(static_cast<uint>(getuid()));

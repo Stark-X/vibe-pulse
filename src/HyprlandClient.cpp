@@ -71,6 +71,14 @@ QString HyprlandClient::focusWindow(const QString &address)
     return {};
 }
 
+void HyprlandClient::resizeWindow(const QString &address, int width, int height)
+{
+    if (address.isEmpty() || !available()) return;
+    const QString cmd = QStringLiteral("dispatch pin address:%1 ; dispatch resizewindowpixel exact %2 %3,address:%1 ; dispatch pin address:%1")
+        .arg(address).arg(width).arg(height);
+    QProcess::startDetached(QStringLiteral("hyprctl"), {QStringLiteral("--batch"), cmd});
+}
+
 QString HyprlandClient::findWindowAddress(quint32 agentPid,
                                            const QVector<HyprWindow> &wins)
 {
