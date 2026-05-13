@@ -494,3 +494,10 @@ Temporary Items
 # Built Visual Studio Code Extensions
 *.vsix
 
+
+# pulse Qt build outputs
+pulse/build_rel/
+pulse/build/
+
+# Deprecated Tauri-era OpenSpec (Qt rewrite is complete)
+src-tauri/openspec/
