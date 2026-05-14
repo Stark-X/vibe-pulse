@@ -10,8 +10,6 @@ Item {
 
     readonly property var agentData: agentRow >= 0 ? agentModel.get(agentRow) : {}
 
-    property bool amendMode: false
-
     Column {
         id: innerCol
         anchors { left: parent.left; right: parent.right; top: parent.top
@@ -59,15 +57,17 @@ Item {
             }
         }
 
-        // No / Amend / Yes  (normal mode)
+        // No / Yes
         Row {
+            id: btnRow
             width: parent.width
             spacing: Theme.s2
-            visible: !root.amendMode
+
+            property bool anyHovered: denyMa.containsMouse || allowMa.containsMouse
 
             Rectangle {
                 id: denyBtn
-                width: (parent.width - Theme.s2 * 2) / 3
+                width: (parent.width - Theme.s2) / 2
                 height: 36
                 radius: 10
                 color: denyMa.containsMouse ? Theme.surface2 : Theme.surface1
@@ -91,46 +91,20 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: agentModel.decidePermission(agentRow, false)
-                }
-            }
-
-            Rectangle {
-                id: amendBtn
-                width: (parent.width - Theme.s2 * 2) / 3
-                height: 36
-                radius: 10
-                color: amendMa.containsMouse ? Theme.surface2 : Theme.surface1
-                border.color: Qt.rgba(Theme.violet.r, Theme.violet.g, Theme.violet.b,
-                                      amendMa.containsMouse ? 0.55 : 0.38)
-                border.width: 1
-
-                Behavior on color { ColorAnimation { duration: 100 } }
-                Behavior on border.color { ColorAnimation { duration: 100 } }
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "Amend"
-                    color: Theme.violet
-                    font.pixelSize: 12
-                    font.weight: Font.Medium
-                }
-
-                MouseArea {
-                    id: amendMa
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        root.amendMode = true
-                        Qt.callLater(function() { amendInput.forceActiveFocus() })
+                        const txt = noteInput.text.trim()
+                        if (txt.length > 0)
+                            agentModel.decidePermissionAmend(agentRow, false, txt)
+                        else
+                            agentModel.decidePermission(agentRow, false)
+                        noteInput.text = ""
                     }
                 }
             }
 
             Rectangle {
                 id: allowBtn
-                width: (parent.width - Theme.s2 * 2) / 3
+                width: (parent.width - Theme.s2) / 2
                 height: 36
                 radius: 10
                 color: allowMa.containsMouse ? Theme.surface2 : Theme.surface1
@@ -154,30 +128,38 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: agentModel.decidePermission(agentRow, true)
+                    onClicked: {
+                        const txt = noteInput.text.trim()
+                        if (txt.length > 0)
+                            agentModel.decidePermissionAmend(agentRow, true, txt)
+                        else
+                            agentModel.decidePermission(agentRow, true)
+                        noteInput.text = ""
+                    }
                 }
             }
         }
 
-        // Amend input panel
+        // Hover-expanded note input
         Column {
+            id: noteArea
             width: parent.width
             spacing: Theme.s2
-            visible: root.amendMode
+            visible: btnRow.anyHovered || noteInput.activeFocus || noteInput.text.length > 0
+            clip: true
 
             Rectangle {
                 width: parent.width
-                height: 60
+                height: 54
                 radius: 8
                 color: Theme.surface1
                 border.color: Qt.rgba(Theme.violet.r, Theme.violet.g, Theme.violet.b,
-                                      amendInput.activeFocus ? 0.60 : 0.38)
+                                      noteInput.activeFocus ? 0.55 : 0.30)
                 border.width: 1
-
                 Behavior on border.color { ColorAnimation { duration: 100 } }
 
                 TextInput {
-                    id: amendInput
+                    id: noteInput
                     anchors { fill: parent; margins: Theme.s2 }
                     color: Theme.text1
                     font.family: "JetBrains Mono"
@@ -187,126 +169,19 @@ Item {
 
                     Text {
                         anchors.fill: parent
-                        text: "Describe amendment…"
+                        text: "Add a note… (optional)"
                         color: Theme.text3
                         font: parent.font
                         visible: parent.text.length === 0 && !parent.activeFocus
                     }
 
-                    Keys.onEscapePressed: {
-                        root.amendMode = false
-                        amendInput.text = ""
-                    }
-                }
-            }
-
-            // Cancel / No with amend / Yes with amend
-            Row {
-                width: parent.width
-                spacing: Theme.s2
-
-                readonly property bool hasText: amendInput.text.trim().length > 0
-
-                Rectangle {
-                    width: (parent.width - Theme.s2 * 2) / 3
-                    height: 30
-                    radius: 8
-                    color: cancelMa.containsMouse ? Theme.surface2 : Theme.surface1
-                    border.color: Qt.rgba(Theme.text3.r, Theme.text3.g, Theme.text3.b, 0.30)
-                    border.width: 1
-                    Behavior on color { ColorAnimation { duration: 100 } }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Cancel"
-                        color: Theme.text2
-                        font.pixelSize: 10
-                        font.weight: Font.Medium
-                    }
-
-                    MouseArea {
-                        id: cancelMa
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            root.amendMode = false
-                            amendInput.text = ""
-                        }
-                    }
-                }
-
-                Rectangle {
-                    width: (parent.width - Theme.s2 * 2) / 3
-                    height: 30
-                    radius: 8
-                    color: noAmendMa.containsMouse ? Theme.surface2 : Theme.surface1
-                    border.color: Qt.rgba(Theme.coral.r, Theme.coral.g, Theme.coral.b,
-                                          parent.hasText
-                                          ? (noAmendMa.containsMouse ? 0.55 : 0.38)
-                                          : 0.15)
-                    border.width: 1
-                    Behavior on color { ColorAnimation { duration: 100 } }
-                    Behavior on border.color { ColorAnimation { duration: 100 } }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "No"
-                        color: parent.parent.hasText ? Theme.coral : Theme.text3
-                        font.pixelSize: 10
-                        font.weight: Font.Medium
-                    }
-
-                    MouseArea {
-                        id: noAmendMa
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: parent.parent.hasText
-                                     ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onClicked: {
-                            const txt = amendInput.text.trim()
-                            if (txt.length === 0) return
-                            agentModel.decidePermissionAmend(agentRow, false, txt)
-                            root.amendMode = false
-                            amendInput.text = ""
-                        }
-                    }
-                }
-
-                Rectangle {
-                    width: (parent.width - Theme.s2 * 2) / 3
-                    height: 30
-                    radius: 8
-                    color: yesAmendMa.containsMouse ? Theme.surface2 : Theme.surface1
-                    border.color: Qt.rgba(Theme.green.r, Theme.green.g, Theme.green.b,
-                                          parent.hasText
-                                          ? (yesAmendMa.containsMouse ? 0.65 : 0.45)
-                                          : 0.15)
-                    border.width: 1
-                    Behavior on color { ColorAnimation { duration: 100 } }
-                    Behavior on border.color { ColorAnimation { duration: 100 } }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Yes"
-                        color: parent.parent.hasText ? Theme.green : Theme.text3
-                        font.pixelSize: 10
-                        font.weight: Font.DemiBold
-                    }
-
-                    MouseArea {
-                        id: yesAmendMa
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: parent.parent.hasText
-                                     ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onClicked: {
-                            const txt = amendInput.text.trim()
-                            if (txt.length === 0) return
+                    Keys.onReturnPressed: {
+                        const txt = noteInput.text.trim()
+                        if (txt.length > 0)
                             agentModel.decidePermissionAmend(agentRow, true, txt)
-                            root.amendMode = false
-                            amendInput.text = ""
-                        }
+                        else
+                            agentModel.decidePermission(agentRow, true)
+                        noteInput.text = ""
                     }
                 }
             }
@@ -316,7 +191,6 @@ Item {
     }
 
     onAgentRowChanged: {
-        amendMode = false
-        amendInput.text = ""
+        noteInput.text = ""
     }
 }

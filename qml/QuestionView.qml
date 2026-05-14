@@ -66,7 +66,7 @@ Item {
 
                             Keycap {
                                 anchors.verticalCenter: parent.verticalCenter
-                                key: "⌘" + (index + 1)
+                                key: "❖" + (index + 1)
                             }
 
                             Text {

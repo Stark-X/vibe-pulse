@@ -85,6 +85,15 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        const txt = commentInput.text.trim()
+                        if (txt.length > 0) {
+                            agentModel.commentPlan(agentRow, txt)
+                            commentInput.text = ""
+                        } else {
+                            commentInput.forceActiveFocus()
+                        }
+                    }
                 }
             }
 
@@ -128,6 +137,52 @@ Item {
                     onClicked: agentModel.approvePlan(agentRow)
                 }
             }
+        }
+
+        // Comment input area — shown when Comment is hovered or has focus/text
+        Column {
+            id: commentArea
+            width: parent.width
+            spacing: 0
+            visible: commentMa.containsMouse || commentInput.activeFocus || commentInput.text.length > 0
+
+            Rectangle {
+                width: parent.width
+                height: 54
+                radius: 8
+                color: Theme.surface1
+                border.color: Qt.rgba(1, 1, 1, commentInput.activeFocus ? 0.22 : 0.12)
+                border.width: 1
+                Behavior on border.color { ColorAnimation { duration: 100 } }
+
+                TextInput {
+                    id: commentInput
+                    anchors { fill: parent; margins: Theme.s2 }
+                    color: Theme.text1
+                    font.family: "JetBrains Mono"
+                    font.pixelSize: 11
+                    wrapMode: TextInput.Wrap
+                    clip: true
+
+                    Text {
+                        anchors.fill: parent
+                        text: "Add a comment…"
+                        color: Theme.text3
+                        font: parent.font
+                        visible: parent.text.length === 0 && !parent.activeFocus
+                    }
+
+                    Keys.onReturnPressed: {
+                        const txt = commentInput.text.trim()
+                        if (txt.length > 0) {
+                            agentModel.commentPlan(agentRow, txt)
+                            commentInput.text = ""
+                        }
+                    }
+                }
+            }
+
+            Item { width: 1; height: Theme.s2 }
         }
 
         Item { width: 1; height: Theme.s1 }
