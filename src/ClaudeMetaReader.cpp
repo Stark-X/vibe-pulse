@@ -53,6 +53,7 @@ struct Interaction {
     QString     markdown;
     QString     tool;
     QString     target;
+    QString     desc;
     QStringList options;
     Kind        kind = None;
 };
@@ -124,6 +125,14 @@ static Interaction lastClaudeInteraction(const QByteArray &tail)
                 ix.kind   = Interaction::Permission;
                 ix.tool   = name;
                 ix.target = in.value(QStringLiteral("file_path")).toString();
+                ix.desc   = in.value(QStringLiteral("description")).toString();
+                return ix;
+            }
+            if (name == QStringLiteral("Bash")) {
+                ix.kind   = Interaction::Permission;
+                ix.tool   = name;
+                ix.target = in.value(QStringLiteral("command")).toString();
+                ix.desc   = in.value(QStringLiteral("description")).toString();
                 return ix;
             }
             return {};
@@ -250,6 +259,7 @@ ClaudeMeta ClaudeMetaReader::read(quint32 pid, const QString &cwd,
             m.pulseState       = PulseState::Permission;
             m.permissionTool   = ix.tool;
             m.permissionTarget = ix.target;
+            m.permissionDesc   = ix.desc;
             m.interactionId    = ix.id;
             return m;
         }

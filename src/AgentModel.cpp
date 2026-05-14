@@ -61,6 +61,7 @@ QHash<int, QByteArray> AgentModel::roleNames() const
         { PlanHtmlRole,        "planHtml"        },
         { PermissionToolRole,  "permissionTool"  },
         { PermissionTargetRole,"permissionTarget"},
+        { PermissionDescRole,  "permissionDesc"  },
         { InteractionIdRole,   "interactionId"   },
     };
 }
@@ -90,6 +91,7 @@ QVariant AgentModel::data(const QModelIndex &idx, int role) const
     case PlanHtmlRole:        return a.planHtml;
     case PermissionToolRole:  return a.permissionTool;
     case PermissionTargetRole:return a.permissionTarget;
+    case PermissionDescRole:  return a.permissionDesc;
     case InteractionIdRole:   return a.interactionId;
     default:                  return {};
     }
@@ -123,6 +125,7 @@ QVariantMap AgentModel::get(int row) const
         { QStringLiteral("planHtml"),        a.planHtml         },
         { QStringLiteral("permissionTool"),  a.permissionTool   },
         { QStringLiteral("permissionTarget"),a.permissionTarget },
+        { QStringLiteral("permissionDesc"),  a.permissionDesc   },
         { QStringLiteral("interactionId"),   a.interactionId    },
     };
 }

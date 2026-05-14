@@ -19,6 +19,7 @@ struct ClaudeMeta {
     QString     planHtml;
     QString     permissionTool;
     QString     permissionTarget;
+    QString     permissionDesc;
     QString     interactionId;
 };
 

@@ -34,6 +34,7 @@ public:
         PlanHtmlRole,
         PermissionToolRole,
         PermissionTargetRole,
+        PermissionDescRole,
         InteractionIdRole,
     };
     Q_ENUM(Roles)

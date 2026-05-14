@@ -41,6 +41,7 @@ struct AgentInfo {
     QString     planHtml;
     QString     permissionTool;
     QString     permissionTarget;
+    QString     permissionDesc;
     QString     interactionId;
 
     bool operator==(const AgentInfo &o) const noexcept {
@@ -61,6 +62,7 @@ struct AgentInfo {
             && planHtml == o.planHtml
             && permissionTool == o.permissionTool
             && permissionTarget == o.permissionTarget
+            && permissionDesc == o.permissionDesc
             && interactionId == o.interactionId;
     }
 };

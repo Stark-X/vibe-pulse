@@ -87,7 +87,7 @@ Item {
                 if (pulseState === "working") return agentSub
                 if (pulseState === "question") return "waiting on your answer"
                 if (pulseState === "plan") return "shared a plan for review"
-                if (pulseState === "permission") return "wants to edit a file"
+                if (pulseState === "permission") return "approve " + (agentTool || "edit")
                 return ""
             }
             font.family: "JetBrains Mono"

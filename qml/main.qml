@@ -16,7 +16,7 @@ Window {
     readonly property var widthByState: {
         "idle": 280,
         "working": 380,
-        "permission": 440,
+        "permission": 420,
         "question": 420,
         "plan": 460,
         "expanded": 420
@@ -59,6 +59,7 @@ Window {
             pulseState: root.pulseState
             agentName: agentModel.activeAgentRow >= 0 ? (agentModel.get(agentModel.activeAgentRow).name ?? "") : ""
             agentSub: agentModel.activeAgentRow >= 0 ? (agentModel.get(agentModel.activeAgentRow).currentStep ?? "") : ""
+            agentTool: agentModel.activeAgentRow >= 0 ? (agentModel.get(agentModel.activeAgentRow).permissionTool ?? "") : ""
             agentCount: agentModel.count
             liveTime: clockTimer.timeStr
             onClicked: root.userExpanded = !root.userExpanded

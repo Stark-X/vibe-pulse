@@ -110,6 +110,7 @@ static QStringList enrichAgents(QVector<AgentInfo> &agents,
             a.planHtml        = m.planHtml;
             a.permissionTool  = m.permissionTool;
             a.permissionTarget= m.permissionTarget;
+            a.permissionDesc  = m.permissionDesc;
             a.interactionId   = m.interactionId;
             if (!m.cwd.isEmpty()) {
                 a.cwd  = m.cwd;
