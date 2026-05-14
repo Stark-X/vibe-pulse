@@ -1,5 +1,7 @@
 import QtQuick
+import qml 1.0
 import QtQuick.Window
+import QtQuick.Layouts
 
 Window {
     id: root
@@ -7,306 +9,114 @@ Window {
     color: "transparent"
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
 
-    width:  440
-    height: Math.min(maxContentHeight, Math.max(90, agentList.contentHeight + 57))
+    property string backendState: agentModel.globalState
+    property bool userExpanded: (typeof mockForceExpanded !== "undefined" && mockForceExpanded)
+    property string pulseState: userExpanded ? "expanded" : (agentModel.idleCollapsed ? "idle" : backendState)
 
-    readonly property int maxContentHeight: 321
-    readonly property int contentHeight: agentList.contentHeight + 57
-    readonly property bool listClipped: contentHeight > maxContentHeight
-
-    // ── theme ─────────────────────────────────────────────────────────────────
-    QtObject {
-        id: theme
-        property string name: "midnight"
-
-        readonly property color bg:          name === "aurora" ? Qt.rgba(0.06,0.03,0.13,0.94)
-                                           : name === "carbon" ? Qt.rgba(0.08,0.08,0.08,0.95)
-                                           :                     Qt.rgba(0.05,0.06,0.11,0.94)
-        readonly property color surface:     name === "aurora" ? Qt.rgba(1,1,1,0.04)
-                                           : name === "carbon" ? Qt.rgba(1,1,1,0.05)
-                                           :                     Qt.rgba(1,1,1,0.04)
-        readonly property color borderColor: name === "aurora" ? Qt.rgba(0.8,0.5,1,0.12)
-                                           : name === "carbon" ? Qt.rgba(1,1,1,0.10)
-                                           :                     Qt.rgba(0.5,0.6,1,0.10)
-        readonly property color divider:     Qt.rgba(1,1,1,0.05)
-        readonly property color textPrimary: name === "aurora" ? "#ede8ff"
-                                           : name === "carbon" ? "#e8e8e8" : "#e4e8f4"
-        readonly property color textMuted:   name === "aurora" ? "#8878aa"
-                                           : name === "carbon" ? "#686868" : "#6a7499"
-        readonly property color textDim:     name === "aurora" ? "#6658884"
-                                           : name === "carbon" ? "#505050" : "#4a5270"
-        readonly property color accent:      name === "aurora" ? "#b06ef8"
-                                           : name === "carbon" ? "#909090" : "#6c8eff"
-        readonly property color accentBg:    name === "aurora" ? Qt.rgba(0.69,0.43,0.97,0.12)
-                                           : name === "carbon" ? Qt.rgba(1,1,1,0.08)
-                                           :                     Qt.rgba(0.42,0.55,1,0.12)
-        readonly property color running:     name === "carbon" ? "#5ab85a" : "#3dd68c"
-        readonly property color idle:        "#3d4460"
-        readonly property int   radius:      name === "aurora" ? 16
-                                           : name === "carbon" ? 10 : 14
+    readonly property var widthByState: {
+        "idle": 280,
+        "working": 380,
+        "permission": 440,
+        "question": 420,
+        "plan": 460,
+        "expanded": 420
     }
 
-    // ── background card ───────────────────────────────────────────────────────
+    width: widthByState[pulseState] ?? 380
+    height: header.height + (body.active && body.item ? body.item.implicitHeight + 8 : 8)
+
+    Behavior on width { NumberAnimation { duration: 280; easing.type: Easing.OutQuint } }
+    Behavior on height { NumberAnimation { duration: 280; easing.type: Easing.OutQuint } }
+
     Rectangle {
+        id: card
         anchors.fill: parent
-        radius:       theme.radius
-        color:        theme.bg
-        border.color: theme.borderColor
+        color: Qt.rgba(0.078, 0.075, 0.11, 0.93)
+        border.color: "#3a384e"
         border.width: 1
+        radius: Theme.pulseRadius
 
-        // subtle inner glow at top edge
+        Behavior on radius { NumberAnimation { duration: 280 } }
+
+        // Top sheen
         Rectangle {
-            anchors { top: parent.top; left: parent.left; right: parent.right }
+            anchors { top: parent.top; left: parent.left; right: parent.right; margins: 1 }
             height: 1
-            color: theme.borderColor
-            opacity: 0.6
+            radius: parent.radius
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0.0; color: "transparent" }
+                GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, 0.08) }
+                GradientStop { position: 1.0; color: "transparent" }
+            }
         }
 
-        // ── header ────────────────────────────────────────────────────────────
-        Item {
+        HeaderBar {
             id: header
-            anchors { top: parent.top; left: parent.left; right: parent.right }
-            anchors.leftMargin:  16
-            anchors.rightMargin: 16
-            height: 44
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            pulseState: root.pulseState
+            agentName: agentModel.activeAgentRow >= 0 ? (agentModel.get(agentModel.activeAgentRow).name ?? "") : ""
+            agentSub: agentModel.activeAgentRow >= 0 ? (agentModel.get(agentModel.activeAgentRow).currentStep ?? "") : ""
+            agentCount: agentModel.count
+            liveTime: clockTimer.timeStr
+            onClicked: root.userExpanded = !root.userExpanded
+        }
 
-            Row {
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 8
+        // Clock tick — updates liveTime every 30 seconds
+        Timer {
+            id: clockTimer
+            interval: 30000
+            repeat: true
+            running: true
+            property string timeStr: Qt.formatTime(new Date(), "HH:mm")
+            onTriggered: timeStr = Qt.formatTime(new Date(), "HH:mm")
+        }
 
-                // pulsing logo dot
-                Rectangle {
-                    width: 8; height: 8; radius: 4
-                    color: theme.accent
-                    anchors.verticalCenter: parent.verticalCenter
-                    SequentialAnimation on opacity {
-                        loops: Animation.Infinite
-                        NumberAnimation { to: 0.5; duration: 1800; easing.type: Easing.InOutSine }
-                        NumberAnimation { to: 1.0; duration: 1800; easing.type: Easing.InOutSine }
-                    }
-                }
-
-                Text {
-                    text: "PULSE"
-                    font.pixelSize: 11
-                    font.letterSpacing: 2.5
-                    font.weight: Font.Bold
-                    color: theme.textMuted
-                    anchors.verticalCenter: parent.verticalCenter
-                }
+        Loader {
+            id: body
+            anchors.top: header.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 8
+            active: pulseState !== "idle" && pulseState !== "working"
+            sourceComponent: {
+                if (pulseState === "permission") return permComp
+                if (pulseState === "question") return questComp
+                if (pulseState === "plan") return planComp
+                if (pulseState === "expanded") return expandedComp
+                return null
             }
 
-            // agent count badge
-            Rectangle {
-                anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-                visible: agentList.count > 0
-                width:  countText.width + 14
-                height: 18
-                radius: 9
-                color:  theme.accentBg
-
-                Text {
-                    id: countText
-                    anchors.centerIn: parent
-                    text: agentList.count + " active"
-                    font.pixelSize: 10
-                    font.letterSpacing: 0.5
-                    font.weight: Font.Medium
-                    color: theme.accent
-                }
+            onLoaded: {
+                item.opacity = 0
+                item.y = -6
+                bodyAnim.start()
             }
         }
 
-        // header divider
-        Rectangle {
-            id: headerDivider
-            anchors { top: header.bottom; topMargin: 2; left: parent.left; right: parent.right }
-            anchors.leftMargin: 16; anchors.rightMargin: 16
-            height: 1
-            color: theme.divider
-        }
-
-        // ── agent list ────────────────────────────────────────────────────────
-        ListView {
-            id: agentList
-            anchors { top: headerDivider.bottom; topMargin: 4; left: parent.left; right: parent.right; bottom: parent.bottom; bottomMargin: root.listClipped ? 0 : 8 }
-            clip:  true
-            model: agentModel
-
-            delegate: Item {
-                id: delegateItem
-                width:  agentList.width
-                height: 66
-
-                // hover + click layer
-                Rectangle {
-                    anchors { fill: parent; leftMargin: 8; rightMargin: 8; topMargin: 2; bottomMargin: 2 }
-                    radius: 10
-                    color: hov.containsMouse ? theme.surface : "transparent"
-                    Behavior on color { ColorAnimation { duration: 120 } }
-                    MouseArea {
-                        id: hov
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape:  model.canJump ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onClicked:    if (model.canJump) agentModel.focusAgent(model.index)
-                    }
-                }
-
-                // ── LEFT: tool icon with status badge ─────────────────────
-                Item {
-                    id: iconArea
-                    width:  36
-                    height: 36
-                    anchors { left: parent.left; leftMargin: 18; verticalCenter: parent.verticalCenter }
-
-                    // icon (known tools)
-                    Image {
-                        visible: model.toolType === "Claude Code" || model.toolType === "Codex"
-                        source:  model.toolType === "Claude Code" ? "qrc:/assets/claude-code.png"
-                               : model.toolType === "Codex"       ? "qrc:/assets/codex.png" : ""
-                        width: 28; height: 28
-                        anchors.centerIn: parent
-                        fillMode: Image.PreserveAspectFit
-                        smooth: true
-                    }
-
-                    // fallback: initials circle
-                    Rectangle {
-                        visible: model.toolType !== "Claude Code" && model.toolType !== "Codex"
-                        anchors.centerIn: parent
-                        width: 28; height: 28; radius: 14
-                        color: theme.accentBg
-                        Text {
-                            anchors.centerIn: parent
-                            text: model.toolType.charAt(0)
-                            font.pixelSize: 13; font.weight: Font.Bold
-                            color: theme.accent
-                        }
-                    }
-
-                    // status badge: bottom-right corner of icon
-                    Rectangle {
-                        anchors { right: parent.right; bottom: parent.bottom }
-                        width: 10; height: 10; radius: 5
-                        color: theme.bg
-                        // outer ring (bg colour creates a border effect)
-
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: 8; height: 8; radius: 4
-                            color: model.sessionBusy ? theme.running : theme.idle
-                            SequentialAnimation on opacity {
-                                loops: Animation.Infinite
-                                running: model.sessionBusy
-                                NumberAnimation { to: 0.35; duration: 1000; easing.type: Easing.InOutSine }
-                                NumberAnimation { to: 1.0;  duration: 1000; easing.type: Easing.InOutSine }
-                            }
-                        }
-                    }
-                }
-
-                // ── RIGHT: name + session + step ──────────────────────────
-                Column {
-                    anchors {
-                        left:           iconArea.right
-                        leftMargin:     12
-                        right:          parent.right
-                        rightMargin:    16
-                        verticalCenter: parent.verticalCenter
-                    }
-                    spacing: 3
-
-                    Text {
-                        width: parent.width
-                        text:  model.name + (model.sessionName ? "  ·  " + model.sessionName : "")
-                        font.pixelSize: 15
-                        font.weight: Font.DemiBold
-                        color: theme.textPrimary
-                        elide: Text.ElideRight
-                    }
-
-                    Text {
-                        visible: (model.currentStep ?? "") !== ""
-                        width:   parent.width
-                        text:    model.currentStep ?? ""
-                        font.pixelSize: 12
-                        color: theme.textMuted
-                        elide: Text.ElideRight
-                    }
-
-                    // show tool name when no step (idle agents)
-                    Text {
-                        visible: (model.currentStep ?? "") === ""
-                        width:   parent.width
-                        text:    model.toolType
-                        font.pixelSize: 11
-                        font.letterSpacing: 0.3
-                        color: theme.textDim
-                        elide: Text.ElideRight
-                    }
-                }
-            }
-
-            // empty state
-            Column {
-                anchors.centerIn: parent
-                visible: agentList.count === 0
-                spacing: 8
-
-                Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    width: 32; height: 32; radius: 16
-                    color: Qt.rgba(1,1,1,0.04)
-                    Text {
-                        anchors.centerIn: parent
-                        text: "◦"
-                        font.pixelSize: 18
-                        color: theme.textDim
-                    }
-                }
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: "No agents running"
-                    color: theme.textMuted
-                    font.pixelSize: 13
-                }
-            }
-        }
-
-        // ── clipped indicator ─────────────────────────────────────────────────
-        Item {
-            visible: root.listClipped
-            z: 1
-            anchors { bottom: parent.bottom; left: parent.left; right: parent.right }
-            height: 72
-
-            // fade gradient
-            Rectangle {
-                anchors.fill: parent
-                anchors.bottomMargin: 0
-                radius: theme.radius
-                gradient: Gradient {
-                    GradientStop { position: 0.3; color: Qt.rgba(theme.bg.r, theme.bg.g, theme.bg.b, 0.0) }
-                    GradientStop { position: 0.7; color: Qt.rgba(theme.bg.r, theme.bg.g, theme.bg.b, 0.92) }
-                    GradientStop { position: 1.0; color: Qt.rgba(theme.bg.r, theme.bg.g, theme.bg.b, 1.0) }
-                }
-            }
-
-            Text {
-                anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: 10 }
-                text: "↓  " + Math.ceil((agentList.contentHeight - agentList.height) / 66) + " more hidden"
-                font.pixelSize: 10
-                font.letterSpacing: 0.5
-                font.weight: Font.Medium
-                color: theme.textMuted
-            }
+        ParallelAnimation {
+            id: bodyAnim
+            NumberAnimation { target: body.item; property: "opacity"; to: 1; duration: 200; easing.type: Easing.OutCubic }
+            NumberAnimation { target: body.item; property: "y"; to: 0; duration: 200; easing.type: Easing.OutCubic }
         }
     }
 
-    Component.onCompleted: theme.name = appSettings.theme
+    Component { id: permComp; PermissionView { agentRow: agentModel.activeAgentRow } }
+    Component { id: questComp; QuestionView { agentRow: agentModel.activeAgentRow } }
+    Component { id: planComp; PlanView { agentRow: agentModel.activeAgentRow } }
+    Component { id: expandedComp; ExpandedView { width: root.width } }
+
     Connections {
         target: appSettings
-        function onThemeChanged() { theme.name = appSettings.theme }
+        function onThemeChanged() { Theme.name = appSettings.theme }
+        function onShapeChanged() { Theme.shape = appSettings.shape }
+    }
+
+    Component.onCompleted: {
+        Theme.name = appSettings.theme
+        Theme.shape = appSettings.shape
     }
 }
