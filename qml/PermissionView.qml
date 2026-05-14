@@ -5,126 +5,104 @@ import qml 1.0
 Item {
     id: root
     width: parent ? parent.width : 0
-    // Height driven by parent (Loader anchors.fill); buttons pinned to bottom.
-    // Minimum height so layout never collapses.
-    implicitHeight: scrollCol.implicitHeight + btnRow.height + Theme.s3 * 2 + Theme.s2
+    implicitHeight: infoCol.implicitHeight + 80 + btnRow.height + Theme.s3 * 3
 
     property int agentRow: -1
     readonly property var agentData: agentRow >= 0 ? agentModel.get(agentRow) : {}
 
-    // ── scrollable info area ──────────────────────────────────────────────────
-    Flickable {
-        id: flick
+    // ── static info area ──────────────────────────────────────────────────────
+    Column {
+        id: infoCol
         anchors {
             left: parent.left; right: parent.right
             top: parent.top
-            // leave room for btn row + spacing
-            bottom: btnRow.top; bottomMargin: Theme.s3
+            leftMargin: Theme.s4; rightMargin: Theme.s4; topMargin: Theme.s3
         }
-        contentHeight: scrollCol.implicitHeight
-        clip: true
+        spacing: Theme.s2
 
-        ScrollBar.vertical: ScrollBar {
-            policy: ScrollBar.AsNeeded
-            contentItem: Rectangle {
-                implicitWidth: 4
-                radius: 2
-                color: Qt.rgba(1, 1, 1, 0.25)
-            }
-            background: Item {}
-        }
+        Rectangle { width: parent.width; height: 1; color: Theme.borderWeak }
 
-        Column {
-            id: scrollCol
-            anchors { left: parent.left; right: parent.right
-                      leftMargin: Theme.s4; rightMargin: Theme.s4; topMargin: Theme.s2 }
+        Row {
             spacing: Theme.s2
 
-            Rectangle { width: parent.width; height: 1; color: Theme.borderWeak }
-
-            // Tool badge + "permission required"
-            Row {
-                spacing: Theme.s2
-
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: toolLbl.implicitWidth + 12; height: 20; radius: 4
-                    color: Qt.rgba(Theme.peach.r, Theme.peach.g, Theme.peach.b, 0.14)
-                    border.color: Qt.rgba(Theme.peach.r, Theme.peach.g, Theme.peach.b, 0.42)
-                    border.width: 1
-                    Text {
-                        id: toolLbl
-                        anchors.centerIn: parent
-                        text: (agentData.permissionTool ?? "TOOL").toUpperCase()
-                        font.family: "JetBrains Mono"; font.pixelSize: 9; font.weight: Font.Bold
-                        color: Theme.peach
-                    }
-                }
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "permission required"
-                    font.pixelSize: 11; color: Theme.text3
-                }
-            }
-
-            // Command / file path  — prominent, full text, wraps
-            Text {
-                width: parent.width
-                text: agentData.permissionTarget ?? ""
-                font.family: "JetBrains Mono"; font.pixelSize: 11; font.weight: Font.Medium
-                color: Theme.text1
-                wrapMode: Text.Wrap
-                visible: text !== ""
-            }
-
-            // Description (optional)
-            Text {
-                width: parent.width
-                text: agentData.permissionDesc ?? ""
-                font.pixelSize: 10; color: Theme.text3
-                wrapMode: Text.Wrap
-                visible: text !== ""
-            }
-
-            Item { width: 1; height: Theme.s1 }
-
-            // Note input
             Rectangle {
-                width: parent.width
-                height: Math.max(44, Math.min(noteInput.contentHeight + Theme.s2 * 2, 80))
-                radius: 8; color: Theme.surface1
-                border.color: Qt.rgba(Theme.violet.r, Theme.violet.g, Theme.violet.b,
-                                      noteInput.activeFocus ? 0.55 : 0.22)
+                anchors.verticalCenter: parent.verticalCenter
+                width: toolLbl.implicitWidth + 12; height: 20; radius: 4
+                color: Qt.rgba(Theme.peach.r, Theme.peach.g, Theme.peach.b, 0.14)
+                border.color: Qt.rgba(Theme.peach.r, Theme.peach.g, Theme.peach.b, 0.42)
                 border.width: 1
-                Behavior on border.color { ColorAnimation { duration: 100 } }
-                Behavior on height       { NumberAnimation  { duration: 100 } }
-
-                TextEdit {
-                    id: noteInput
-                    anchors { fill: parent; margins: Theme.s2 }
-                    color: Theme.text1
-                    font.family: "JetBrains Mono"; font.pixelSize: 11
-                    wrapMode: TextEdit.Wrap; clip: true; selectByMouse: true
-
-                    Text {
-                        anchors.fill: parent
-                        text: "Add a note… (Enter = confirm, Shift+Enter = newline)"
-                        color: Theme.text3; font: parent.font
-                        visible: parent.text.length === 0 && !parent.activeFocus
-                        wrapMode: Text.Wrap
-                    }
-
-                    Keys.onReturnPressed: event => {
-                        if (event.modifiers & Qt.ShiftModifier || event.modifiers & Qt.AltModifier) {
-                            event.accepted = false; return
-                        }
-                        event.accepted = true
-                        _decide(true)
-                    }
+                Text {
+                    id: toolLbl
+                    anchors.centerIn: parent
+                    text: (agentData.permissionTool ?? "TOOL").toUpperCase()
+                    font.family: "JetBrains Mono"; font.pixelSize: 9; font.weight: Font.Bold
+                    color: Theme.peach
                 }
             }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "permission required"
+                font.pixelSize: 11; color: Theme.text3
+            }
+        }
 
-            Item { width: 1; height: Theme.s1 }
+        Text {
+            width: parent.width
+            text: agentData.permissionTarget ?? ""
+            font.family: "JetBrains Mono"; font.pixelSize: 11; font.weight: Font.Medium
+            color: Theme.text1
+            wrapMode: Text.Wrap
+            visible: text !== ""
+        }
+
+        Text {
+            width: parent.width
+            text: agentData.permissionDesc ?? ""
+            font.pixelSize: 10; color: Theme.text3
+            wrapMode: Text.Wrap
+            visible: text !== ""
+        }
+
+        Item { width: 1; height: Theme.s1 }
+    }
+
+    // ── Note input — fills remaining space between info and buttons ───────────
+    Rectangle {
+        id: noteBox
+        anchors {
+            left: parent.left; right: parent.right
+            top: infoCol.bottom
+            bottom: btnRow.top; bottomMargin: Theme.s3
+            leftMargin: Theme.s4; rightMargin: Theme.s4
+        }
+        radius: 8; color: Theme.surface1
+        border.color: Qt.rgba(Theme.violet.r, Theme.violet.g, Theme.violet.b,
+                              noteInput.activeFocus ? 0.55 : 0.22)
+        border.width: 1
+        Behavior on border.color { ColorAnimation { duration: 100 } }
+
+        TextEdit {
+            id: noteInput
+            anchors { fill: parent; margins: Theme.s2 }
+            color: Theme.text1
+            font.family: "JetBrains Mono"; font.pixelSize: 11
+            wrapMode: TextEdit.Wrap; clip: true; selectByMouse: true
+
+            Text {
+                anchors.fill: parent
+                text: "Add a note… (Enter = confirm, Shift+Enter = newline)"
+                color: Theme.text3; font: parent.font
+                visible: parent.text.length === 0 && !parent.activeFocus
+                wrapMode: Text.Wrap
+            }
+
+            Keys.onReturnPressed: event => {
+                if (event.modifiers & Qt.ShiftModifier || event.modifiers & Qt.AltModifier) {
+                    event.accepted = false; return
+                }
+                event.accepted = true
+                _decide(true)
+            }
         }
     }
 
