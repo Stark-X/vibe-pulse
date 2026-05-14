@@ -1,24 +1,139 @@
 #include "ClaudeMetaReader.h"
+#include "MiniMd.h"
 
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
-#include <QStringList>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonValue>
+#include <QStringList>
 
 static QString encodeCwd(const QString &cwd)
 {
-    // mirrors Rust: cwd.replace('/', '-')
     QString enc = cwd;
     enc.replace(QLatin1Char('/'), QLatin1Char('-'));
     return enc;
 }
 
+static QString transcriptPath(const QString &home, const QString &cwd,
+                               const QString &sessionId)
+{
+    return QStringLiteral("%1/.claude/projects/%2/%3.jsonl")
+        .arg(home, encodeCwd(cwd), sessionId);
+}
+
+static QByteArray readTail(const QString &path, qint64 maxBytes,
+                            QStringList *watchPaths)
+{
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+        return {};
+    if (watchPaths) *watchPaths << path;
+
+    const qint64 size = f.size();
+    if (size > maxBytes)
+        f.seek(size - maxBytes);
+
+    QByteArray tail = f.readAll();
+    if (size > maxBytes) {
+        const int nl = tail.indexOf('\n');
+        if (nl >= 0)
+            tail = tail.mid(nl + 1);
+    }
+    return tail;
+}
+
+struct Interaction {
+    enum Kind { None, Question, Plan, Permission };
+    QString     id;
+    QString     prompt;
+    QString     title;
+    QString     markdown;
+    QString     tool;
+    QString     target;
+    QStringList options;
+    Kind        kind = None;
+};
+
+static QStringList optionStrings(const QJsonArray &arr)
+{
+    QStringList result;
+    for (const QJsonValue &v : arr) {
+        if (v.isString()) {
+            result << v.toString();
+        } else {
+            const QString label = v.toObject().value(QStringLiteral("label")).toString();
+            if (!label.isEmpty())
+                result << label;
+        }
+    }
+    return result;
+}
+
+static Interaction lastClaudeInteraction(const QByteArray &tail)
+{
+    const QList<QByteArray> lines = tail.split('\n');
+    for (int i = lines.size() - 1; i >= 0; --i) {
+        const QByteArray raw = lines[i].trimmed();
+        if (raw.isEmpty())
+            continue;
+
+        QJsonParseError err;
+        const QJsonDocument doc = QJsonDocument::fromJson(raw, &err);
+        if (err.error != QJsonParseError::NoError)
+            continue;
+
+        const QJsonObject obj = doc.object();
+        if (obj.value(QStringLiteral("type")).toString() != QStringLiteral("assistant"))
+            continue;
+
+        const QJsonArray content = obj.value(QStringLiteral("message"))
+                                       .toObject()
+                                       .value(QStringLiteral("content"))
+                                       .toArray();
+        for (int j = content.size() - 1; j >= 0; --j) {
+            const QJsonObject item = content[j].toObject();
+            if (item.value(QStringLiteral("type")).toString() != QStringLiteral("tool_use"))
+                continue;
+
+            const QString name  = item.value(QStringLiteral("name")).toString();
+            const QJsonObject in = item.value(QStringLiteral("input")).toObject();
+            Interaction ix;
+            ix.id = item.value(QStringLiteral("id")).toString();
+
+            if (name == QStringLiteral("AskUserQuestion")) {
+                ix.kind   = Interaction::Question;
+                ix.prompt = in.value(QStringLiteral("question")).toString();
+                if (ix.prompt.isEmpty())
+                    ix.prompt = in.value(QStringLiteral("prompt")).toString();
+                ix.options = optionStrings(in.value(QStringLiteral("options")).toArray());
+                return ix;
+            }
+            if (name == QStringLiteral("ExitPlanMode")) {
+                ix.kind     = Interaction::Plan;
+                ix.markdown = in.value(QStringLiteral("plan")).toString();
+                if (ix.markdown.isEmpty())
+                    ix.markdown = in.value(QStringLiteral("markdown")).toString();
+                ix.title = in.value(QStringLiteral("title")).toString();
+                return ix;
+            }
+            if (name == QStringLiteral("Edit") || name == QStringLiteral("Write")
+                    || name == QStringLiteral("MultiEdit")) {
+                ix.kind   = Interaction::Permission;
+                ix.tool   = name;
+                ix.target = in.value(QStringLiteral("file_path")).toString();
+                return ix;
+            }
+            return {};
+        }
+    }
+    return {};
+}
+
 static QString lastToolUse(const QByteArray &tail)
 {
-    // Split into lines, iterate in reverse, find last assistant tool_use
     QList<QByteArray> lines = tail.split('\n');
     for (int i = lines.size() - 1; i >= 0; --i) {
         const QByteArray &raw = lines[i].trimmed();
@@ -45,7 +160,7 @@ static QString lastToolUse(const QByteArray &tail)
             if (detail.isEmpty()) detail = input.value(QStringLiteral("command")).toString();
             if (detail.isEmpty()) detail = input.value(QStringLiteral("path")).toString();
             if (!detail.isEmpty()) {
-                detail = detail.section(QLatin1Char('\n'), 0, 0); // first line only
+                detail = detail.section(QLatin1Char('\n'), 0, 0);
                 return tool + QStringLiteral(" · ") + detail;
             }
             return tool;
@@ -63,13 +178,10 @@ ClaudeMeta ClaudeMetaReader::read(quint32 pid, const QString &cwd,
     if (home.isEmpty())
         return m;
 
-    // Session file — try PID-named file first, then search by cwd fallback
     QString sessionPath =
         QStringLiteral("%1/.claude/sessions/%2.json").arg(home).arg(pid);
 
     if (!QFileInfo::exists(sessionPath)) {
-        // The detected "claude" launcher has a different PID than the worker
-        // that writes the session file — find by matching cwd instead.
         const QDir sessDir(QStringLiteral("%1/.claude/sessions").arg(home));
         qint64 bestUpdated = 0;
         for (const QString &entry : sessDir.entryList({QStringLiteral("*.json")}, QDir::Files)) {
@@ -109,42 +221,52 @@ ClaudeMeta ClaudeMetaReader::read(quint32 pid, const QString &cwd,
     if (m.sessionId.isEmpty())
         return m;
 
-    // Waiting for permission — use waitingFor directly, skip JSONL read
     if (status == QStringLiteral("waiting")) {
         const QString wf = sobj.value(QStringLiteral("waitingFor")).toString();
         if (!wf.isEmpty() && wf != QStringLiteral("none"))
             m.currentStep = wf;
+
+        const QString usedCwd = m.cwd.isEmpty() ? cwd : m.cwd;
+        const QByteArray tail = readTail(transcriptPath(home, usedCwd, m.sessionId),
+                                         32768, watchPaths);
+        const Interaction ix = lastClaudeInteraction(tail);
+
+        if (ix.kind == Interaction::Question) {
+            m.pulseState     = PulseState::Question;
+            m.questionPrompt = ix.prompt;
+            m.questionOptions= ix.options;
+            m.interactionId  = ix.id;
+            return m;
+        }
+        if (ix.kind == Interaction::Plan) {
+            m.pulseState   = PulseState::Plan;
+            m.planTitle    = ix.title;
+            m.planMarkdown = ix.markdown;
+            m.planHtml     = miniMdToHtml(ix.markdown);
+            m.interactionId= ix.id;
+            return m;
+        }
+        if (ix.kind == Interaction::Permission) {
+            m.pulseState       = PulseState::Permission;
+            m.permissionTool   = ix.tool;
+            m.permissionTarget = ix.target;
+            m.interactionId    = ix.id;
+            return m;
+        }
+
+        m.pulseState       = PulseState::Permission;
+        m.permissionTarget = m.currentStep;
         return m;
     }
 
-    // Idle — nothing to show, skip JSONL read
-    if (status == QStringLiteral("idle"))
+    if (status == QStringLiteral("idle")) {
+        m.pulseState = PulseState::Idle;
         return m;
+    }
 
-    // Transcript file — tail 8192 bytes
     const QString usedCwd = sobj.value(QStringLiteral("cwd")).toString();
-    const QString enc = encodeCwd(usedCwd.isEmpty() ? cwd : usedCwd);
-    const QString txPath =
-        QStringLiteral("%1/.claude/projects/%2/%3.jsonl")
-            .arg(home, enc, m.sessionId);
-
-    QFile tf(txPath);
-    if (!tf.open(QIODevice::ReadOnly))
-        return m;
-    if (watchPaths) *watchPaths << txPath;
-
-    const qint64 size = tf.size();
-    const qint64 tailSize = 8192;
-    if (size > tailSize)
-        tf.seek(size - tailSize);
-
-    QByteArray tail = tf.readAll();
-    // Discard first (potentially partial) line if we seeked
-    if (size > tailSize) {
-        int nl = tail.indexOf('\n');
-        if (nl >= 0) tail = tail.mid(nl + 1);
-    }
-
-    m.currentStep = lastToolUse(tail);
+    const QString txPath = transcriptPath(home, usedCwd.isEmpty() ? cwd : usedCwd, m.sessionId);
+    m.currentStep = lastToolUse(readTail(txPath, 8192, watchPaths));
+    m.pulseState  = PulseState::Working;
     return m;
 }

@@ -118,6 +118,31 @@ void WaylandLayerShell::initialize()
     m_valid = true;
 }
 
+void WaylandLayerShell::requestResize(int width, int height)
+{
+    if (!m_valid || !m_window)
+        return;
+    // Only resize via QWindow — do NOT call zwlr_layer_surface_v1_set_size
+    // or wl_surface_commit here. Qt's Wayland backend owns the display
+    // connection; calling libwayland-client APIs concurrently crashes.
+    // Instead, store the pending size and apply it during the next
+    // configure callback from the compositor.
+    m_pendingW = width;
+    m_pendingH = height;
+    m_resizePending = true;
+    m_window->resize(width, height);
+}
+
+void WaylandLayerShell::applyPendingResize()
+{
+    if (!m_resizePending || !m_layerSurface)
+        return;
+    m_resizePending = false;
+    zwlr_layer_surface_v1_set_size(m_layerSurface,
+                                    static_cast<uint32_t>(m_pendingW),
+                                    static_cast<uint32_t>(m_pendingH));
+}
+
 void WaylandLayerShell::cleanup()
 {
     if (m_layerSurface) {
@@ -169,12 +194,14 @@ void WaylandLayerShell::registryGlobalRemove(void *data, wl_registry *registry, 
 void WaylandLayerShell::layerSurfaceConfigure(void *data, zwlr_layer_surface_v1 *surface, uint32_t serial, uint32_t width, uint32_t height)
 {
     auto *self = static_cast<WaylandLayerShell *>(data);
-    if (!self || !surface) {
+    if (!self || !surface)
         return;
-    }
 
     Q_UNUSED(width);
     Q_UNUSED(height);
+
+    // Apply pending resize before ack so compositor uses our requested size.
+    self->applyPendingResize();
     zwlr_layer_surface_v1_ack_configure(surface, serial);
 }
 

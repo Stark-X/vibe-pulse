@@ -1,5 +1,8 @@
 #pragma once
+#include "AgentInfo.h"
+
 #include <QString>
+#include <QStringList>
 
 struct ClaudeMeta {
     QString sessionId;
@@ -7,6 +10,16 @@ struct ClaudeMeta {
     bool    sessionBusy = true;
     QString currentStep;
     QString cwd;
+
+    PulseState  pulseState = PulseState::Idle;
+    QString     questionPrompt;
+    QStringList questionOptions;
+    QString     planTitle;
+    QString     planMarkdown;
+    QString     planHtml;
+    QString     permissionTool;
+    QString     permissionTarget;
+    QString     interactionId;
 };
 
 class ClaudeMetaReader

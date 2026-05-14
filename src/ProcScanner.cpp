@@ -1,4 +1,5 @@
 #include "ProcScanner.h"
+#include "MiniMd.h"
 
 #include <QDir>
 #include <QFile>
@@ -110,8 +111,67 @@ quint32 ProcScanner::ppidOf(quint32 pid)
 
 // ── scan ──────────────────────────────────────────────────────────────────────
 
+// ── demo injection ────────────────────────────────────────────────────────────
+// PULSE_DEMO=permission|question|plan|working|idle  → inject a fake agent
+
+static QVector<AgentInfo> demoSnapshot()
+{
+    const QByteArray mode = qgetenv("PULSE_DEMO");
+    if (mode.isEmpty())
+        return {};
+
+    AgentInfo a;
+    a.toolType    = QStringLiteral("Claude Code");
+    a.pid         = 99999;
+    a.status      = QStringLiteral("running");
+    a.name        = QStringLiteral("vibe-island-hyper");
+    a.cwd         = QStringLiteral("/home/stark/workspace/personal/vibe-island-hyper");
+    a.sessionId   = QStringLiteral("demo-session-id");
+    a.sessionName = QStringLiteral("demo");
+    a.sessionBusy = true;
+    a.interactionId = QStringLiteral("demo-interaction-id");
+
+    if (mode == "permission") {
+        a.pulseState       = PulseState::Permission;
+        a.permissionTool   = QStringLiteral("Edit");
+        a.permissionTarget = QStringLiteral("src/main.cpp");
+        a.currentStep      = QStringLiteral("Edit src/main.cpp");
+    } else if (mode == "question") {
+        a.pulseState      = PulseState::Question;
+        a.questionPrompt  = QStringLiteral("Which approach should I use for the state machine?");
+        a.questionOptions = { QStringLiteral("Use QStateMachine from Qt"),
+                              QStringLiteral("Custom string-based state in QML"),
+                              QStringLiteral("Enum in C++ backend, string to QML") };
+        a.currentStep     = QStringLiteral("Asking user");
+    } else if (mode == "plan") {
+        a.pulseState    = PulseState::Plan;
+        a.planTitle     = QStringLiteral("Refactor state machine");
+        a.planMarkdown  = QStringLiteral(
+            "## Plan: fix auth bug\n"
+            "I'll harden the JWT middleware so missing/expired tokens fail loudly.\n"
+            "- Add explicit `AuthError` for missing tokens\n"
+            "- Validate expiry in `verify()` with a 30s skew\n"
+            "- Update 4 callers to catch `AuthError`\n"
+            "- Add unit tests for missing/expired/invalid cases\n\n"
+            "~28 lines changed across 3 files. Estimated 4 min.");
+        a.planHtml = miniMdToHtml(a.planMarkdown);
+    } else if (mode == "working") {
+        a.pulseState  = PulseState::Working;
+        a.currentStep = QStringLiteral("Write · src/AgentModel.cpp");
+    } else {
+        a.pulseState  = PulseState::Idle;
+        a.sessionBusy = false;
+    }
+
+    return { a };
+}
+
 QVector<AgentInfo> ProcScanner::scanAll()
 {
+    const QVector<AgentInfo> demo = demoSnapshot();
+    if (!demo.isEmpty())
+        return demo;
+
     QVector<AgentInfo> result;
 
     const QDir procDir(QStringLiteral("/proc"));

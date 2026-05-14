@@ -1,10 +1,15 @@
 #pragma once
+#include "AgentInfo.h"
+
 #include <QString>
+#include <QStringList>
 
 struct CodexMeta {
-    QString sessionId;
-    QString sessionName;
-    QString currentStep;
+    QString    sessionId;
+    QString    sessionName;
+    bool       sessionBusy = true;
+    QString    currentStep;
+    PulseState pulseState = PulseState::Idle;
 };
 
 class CodexMetaReader

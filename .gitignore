@@ -501,3 +501,4 @@ build_rel/
 
 # Deprecated Tauri-era OpenSpec (Qt rewrite is complete)
 src-tauri/openspec/
+.ace-tool/

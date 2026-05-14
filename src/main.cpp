@@ -23,6 +23,69 @@
 #include "TmuxResolver.h"
 #include "WaylandLayerShell.h"
 
+// Build a mock snapshot for UI preview — PULSE_MOCK=<scenario>
+// Scenarios: idle, working, permission, question, plan, expanded
+static QVector<AgentInfo> buildMockSnapshot(const QString &scenario)
+{
+    QVector<AgentInfo> agents;
+
+    static quint32 mockPidCounter = 10000;
+    auto mkAgent = [](const QString &name, const QString &tool, const QString &step,
+                      PulseState state, bool busy = true) -> AgentInfo {
+        AgentInfo a;
+        a.name        = name;
+        a.toolType    = tool;
+        a.pid         = mockPidCounter++;
+        a.status      = "running";
+        a.cwd         = "/home/user/" + name;
+        a.sessionId   = "sess-abc";
+        a.sessionName = name + "-session";
+        a.sessionBusy = busy;
+        a.currentStep = step;
+        a.pulseState  = state;
+        return a;
+    };
+
+    if (scenario == "idle") {
+        agents << mkAgent("vibe-island", "Claude Code", "", PulseState::Idle, false);
+        agents << mkAgent("nova-sdk",    "Codex",       "", PulseState::Idle, false);
+        agents << mkAgent("deepbank",    "Claude Code", "", PulseState::Idle, false);
+    } else if (scenario == "working") {
+        AgentInfo a = mkAgent("vibe-island", "Claude Code",
+                              "Reading src/AgentModel.cpp", PulseState::Working);
+        agents << a;
+    } else if (scenario == "permission") {
+        AgentInfo a = mkAgent("vibe-island", "Claude Code", "", PulseState::Permission);
+        a.permissionTool   = "Edit";
+        a.permissionTarget = "src/AgentModel.cpp";
+        a.interactionId    = "perm-001";
+        agents << a;
+    } else if (scenario == "question") {
+        AgentInfo a = mkAgent("vibe-island", "Claude Code", "", PulseState::Question);
+        a.questionPrompt  = "Which approach should I use for the cache invalidation?";
+        a.questionOptions = { "Invalidate on write", "TTL-based expiry", "Manual flush only" };
+        a.interactionId   = "q-001";
+        agents << a;
+    } else if (scenario == "plan") {
+        AgentInfo a = mkAgent("vibe-island", "Claude Code", "", PulseState::Plan);
+        a.planTitle    = "Refactor AgentModel";
+        a.planMarkdown = "## Plan\n1. Extract state machine\n2. Add unit tests\n3. Update QML bindings";
+        a.planHtml     = "<b>Step 1</b> — Extract state machine into <code>AgentStateMachine.h</code><br>"
+                         "<b>Step 2</b> — Add unit tests for all transitions<br>"
+                         "<b>Step 3</b> — Update QML bindings in <code>main.qml</code>";
+        a.interactionId = "plan-001";
+        agents << a;
+    } else {
+        // "expanded" — multiple agents
+        agents << mkAgent("vibe-island",  "Claude Code", "Writing unit tests",    PulseState::Working);
+        agents << mkAgent("nova-sdk",     "Codex",       "Refactoring auth flow", PulseState::Working);
+        agents << mkAgent("deepbank-fe",  "Claude Code", "",                      PulseState::Idle, false);
+        agents << mkAgent("api-gateway",  "Codex",       "",                      PulseState::Idle, false);
+    }
+
+    return agents;
+}
+
 // Enrich agents in-place with meta (session info, current step, window address).
 // Also returns JSONL/session paths that should be watched for live updates.
 static QStringList enrichAgents(QVector<AgentInfo> &agents,
@@ -35,10 +98,19 @@ static QStringList enrichAgents(QVector<AgentInfo> &agents,
     for (auto &a : agents) {
         if (a.toolType == QStringLiteral("Claude Code")) {
             ClaudeMeta m = ClaudeMetaReader::read(a.pid, a.cwd, &newPaths);
-            a.sessionId   = m.sessionId;
-            a.sessionName = m.sessionName;
-            a.sessionBusy = m.sessionBusy;
-            a.currentStep = m.currentStep;
+            a.sessionId       = m.sessionId;
+            a.sessionName     = m.sessionName;
+            a.sessionBusy     = m.sessionBusy;
+            a.currentStep     = m.currentStep;
+            a.pulseState      = m.pulseState;
+            a.questionPrompt  = m.questionPrompt;
+            a.questionOptions = m.questionOptions;
+            a.planTitle       = m.planTitle;
+            a.planMarkdown    = m.planMarkdown;
+            a.planHtml        = m.planHtml;
+            a.permissionTool  = m.permissionTool;
+            a.permissionTarget= m.permissionTarget;
+            a.interactionId   = m.interactionId;
             if (!m.cwd.isEmpty()) {
                 a.cwd  = m.cwd;
                 a.name = QFileInfo(m.cwd).fileName();
@@ -48,7 +120,9 @@ static QStringList enrichAgents(QVector<AgentInfo> &agents,
             CodexMeta cm = CodexMetaReader::read(a.pid, &newPaths);
             a.sessionId   = cm.sessionId;
             a.sessionName = cm.sessionName;
+            a.sessionBusy = cm.sessionBusy;
             a.currentStep = cm.currentStep;
+            a.pulseState  = cm.pulseState;
         }
         a.windowAddress = HyprlandClient::findWindowAddress(a.pid, wins);
         if (a.windowAddress.isEmpty()) {
@@ -58,10 +132,12 @@ static QStringList enrichAgents(QVector<AgentInfo> &agents,
     }
 
     if (watcher) {
-        // Sync watcher: remove stale paths, add new ones
+        // Sync watcher: remove stale paths, but keep always-watched directories
+        const QString sessionsDir =
+            QDir::homePath() + QStringLiteral("/.claude/sessions");
         const QStringList current = watcher->files() + watcher->directories();
         for (const QString &p : current)
-            if (!newPaths.contains(p))
+            if (!newPaths.contains(p) && p != sessionsDir)
                 watcher->removePath(p);
         for (const QString &p : newPaths)
             if (!current.contains(p))
@@ -98,9 +174,12 @@ int main(int argc, char **argv)
 
     // Shared base agents (proc scan result before enrichment)
     auto *baseAgents = new QVector<AgentInfo>();
+    const bool demoMode = !qgetenv("PULSE_DEMO").isEmpty();
+    const QString mockScenario = QString::fromUtf8(qgetenv("PULSE_MOCK"));
+    const bool isMock = !mockScenario.isEmpty();
 
     auto doRefresh = [=]() {
-        if (baseAgents->isEmpty()) return;
+        if (baseAgents->isEmpty() || demoMode || isMock) return;
         QVector<AgentInfo> agents = *baseAgents;
         enrichAgents(agents, watcher);
         model->setSnapshot(agents);
@@ -112,18 +191,28 @@ int main(int argc, char **argv)
     QObject::connect(watcher, &QFileSystemWatcher::directoryChanged,
                      debounce, [debounce](const QString &) { debounce->start(); });
 
+    if (isMock) {
+        // Inject static mock snapshot — scanner never starts
+        model->setSnapshot(buildMockSnapshot(mockScenario));
+    }
+
     // ── proc scanner ──────────────────────────────────────────────────────────
     QObject::connect(scanner, &ProcScanner::snapshotReady, &app,
                      [=](QVector<AgentInfo> agents) {
-        *baseAgents = agents;           // save raw proc scan result
-        enrichAgents(agents, watcher);  // enrich + update watch list
+        if (isMock) return;  // mock mode: ignore real proc data
+        *baseAgents = agents;
+        if (!demoMode)
+            enrichAgents(agents, watcher);  // skip enrichment in demo mode
         model->setSnapshot(agents);
     });
 
     // ── QML engine ────────────────────────────────────────────────────────────
     QQmlEngine engine;
+    engine.addImportPath(QStringLiteral("qrc:/"));
     engine.rootContext()->setContextProperty(QStringLiteral("agentModel"),  model);
     engine.rootContext()->setContextProperty(QStringLiteral("appSettings"), settings);
+    engine.rootContext()->setContextProperty(QStringLiteral("mockForceExpanded"),
+        QVariant(mockScenario == QStringLiteral("expanded")));
 
     QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/qml/main.qml")),
                              QQmlComponent::PreferSynchronous);
@@ -148,20 +237,29 @@ int main(int argc, char **argv)
     component.completeCreate();
     window->show();
 
-    // After first frame, find our own window address and track height changes
+    // Resize via Hyprland IPC (the only reliable way for layer-shell windows).
+    // We poll for our own window address once, then resize on geometry changes.
     if (HyprlandClient::available()) {
-        auto *selfAddr = new QString();
-        QTimer::singleShot(500, window, [selfAddr, window]() {
+        auto *selfAddr  = new QString();
+        auto *addrTimer = new QTimer(window);
+        addrTimer->setSingleShot(false);
+        addrTimer->setInterval(400);
+        QObject::connect(addrTimer, &QTimer::timeout, window, [selfAddr, window, addrTimer]() {
+            if (!selfAddr->isEmpty()) { addrTimer->stop(); return; }
             const auto wins = HyprlandClient::clients();
             *selfAddr = HyprlandClient::findWindowAddress(
                 static_cast<quint32>(QCoreApplication::applicationPid()), wins);
+            // Trigger immediate resize once we have the address
+            if (!selfAddr->isEmpty())
+                HyprlandClient::resizeWindow(*selfAddr, window->width(), qMin(window->height(), 600));
         });
+        addrTimer->start();
+
         auto *resizeTimer = new QTimer(window);
         resizeTimer->setSingleShot(true);
-        resizeTimer->setInterval(50);
-        QObject::connect(window, &QWindow::heightChanged, resizeTimer, [resizeTimer]() {
-            resizeTimer->start();
-        });
+        resizeTimer->setInterval(100);
+        QObject::connect(window, &QWindow::widthChanged,  resizeTimer, [resizeTimer]{ resizeTimer->start(); });
+        QObject::connect(window, &QWindow::heightChanged, resizeTimer, [resizeTimer]{ resizeTimer->start(); });
         QObject::connect(resizeTimer, &QTimer::timeout, window, [selfAddr, window]() {
             if (!selfAddr->isEmpty())
                 HyprlandClient::resizeWindow(*selfAddr, window->width(), qMin(window->height(), 600));
@@ -193,6 +291,7 @@ int main(int argc, char **argv)
         });
     });
 
-    scanner->start();
+    if (!isMock)
+        scanner->start();
     return app.exec();
 }

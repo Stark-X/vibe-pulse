@@ -1,0 +1,9 @@
+Module qml
+singleton Theme 1.0 Theme.qml
+HeaderBar 1.0 HeaderBar.qml
+QuestionView 1.0 QuestionView.qml
+PlanView 1.0 PlanView.qml
+PermissionView 1.0 PermissionView.qml
+ExpandedView 1.0 ExpandedView.qml
+AgentRow 1.0 AgentRow.qml
+Keycap 1.0 Keycap.qml

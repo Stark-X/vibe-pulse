@@ -44,6 +44,8 @@ qt_add_executable(pulse
     src/ClaudeMetaReader.h src/ClaudeMetaReader.cpp
     src/CodexMetaReader.h  src/CodexMetaReader.cpp
     src/Settings.h        src/Settings.cpp
+    src/MiniMd.h          src/MiniMd.cpp
+    src/ResponseWriter.h  src/ResponseWriter.cpp
     ${PULSE_PROTOCOL_CODE}
     ${PULSE_PROTOCOL_HEADER}
 )
@@ -67,7 +69,16 @@ target_link_libraries(pulse-toggle PRIVATE Qt6::Core Qt6::Network)
 qt_add_resources(pulse pulse_qml
     PREFIX "/"
     FILES
+        qml/qmldir
         qml/main.qml
+        qml/Theme.qml
+        qml/AgentRow.qml
+        qml/HeaderBar.qml
+        qml/QuestionView.qml
+        qml/PlanView.qml
+        qml/PermissionView.qml
+        qml/ExpandedView.qml
+        qml/Keycap.qml
         assets/claude-code.png
         assets/codex.png
 )

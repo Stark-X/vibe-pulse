@@ -158,5 +158,8 @@ CodexMeta CodexMetaReader::read(quint32 pid, QStringList *watchPaths)
     else
         m.currentStep = lastCmd;
 
+    m.sessionBusy = !taskCompletedAfterCmd;
+    m.pulseState  = m.sessionBusy ? PulseState::Working : PulseState::Idle;
+
     return m;
 }
