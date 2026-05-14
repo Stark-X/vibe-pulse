@@ -1,5 +1,7 @@
 #include "TmuxResolver.h"
 
+#include <climits>
+
 #include <QFile>
 #include <QProcess>
 #include <QStringList>
@@ -23,17 +25,22 @@ static quint32 ppidOf(quint32 pid)
     return 0;
 }
 
-std::optional<quint32> TmuxResolver::findTerminalPid(quint32 agentPid)
+std::optional<TmuxPaneInfo> TmuxResolver::findPaneInfo(quint32 agentPid)
 {
-    // Walk PPid chain; look for a tmux: server or tmux process
-    quint32 cur = agentPid;
+    if (agentPid <= 1)
+        return std::nullopt;
+
+    // Build PPID chain; detect tmux ancestor
+    QVector<quint32> chain;
+    chain.reserve(32);
+    chain.append(agentPid);
     bool inTmux = false;
-    for (int i = 0; i < 16; ++i) {
-        cur = ppidOf(cur);
+    for (int i = 0; i < 32; ++i) {
+        quint32 cur = ppidOf(chain.last());
         if (cur == 0 || cur == 1)
             break;
-        QString c = commOf(cur);
-        if (c.startsWith(QStringLiteral("tmux"))) {
+        chain.append(cur);
+        if (commOf(cur).startsWith(QStringLiteral("tmux"))) {
             inTmux = true;
             break;
         }
@@ -41,50 +48,74 @@ std::optional<quint32> TmuxResolver::findTerminalPid(quint32 agentPid)
     if (!inTmux)
         return std::nullopt;
 
-    // tmux list-panes: find which session contains agentPid
+    // list-panes: find the pane containing agentPid (nearest ancestor wins)
     QProcess panes;
     panes.start(QStringLiteral("tmux"),
                 {QStringLiteral("list-panes"), QStringLiteral("-a"),
                  QStringLiteral("-F"),
-                 QStringLiteral("#{pane_pid}\t#{session_id}\t#{session_name}")});
-    if (!panes.waitForFinished(1000))
+                 QStringLiteral("#{pane_pid}\t#{session_id}\t#{session_name}\t#{window_index}\t#{pane_index}")});
+    if (!panes.waitForFinished(1000) || panes.exitCode() != 0)
         return std::nullopt;
 
-    QString sessionId;
+    int     bestHop       = INT_MAX;
+    quint32 bestPanePid   = 0;
+    QString bestSessionId;
+    QString bestSessionName;
+    int     bestWindowIdx = -1;
+    int     bestPaneIdx   = -1;
+
     for (const QByteArray &raw : panes.readAllStandardOutput().split('\n')) {
-        QStringList parts = QString::fromLocal8Bit(raw).split(QLatin1Char('\t'));
-        if (parts.size() < 2)
+        const QStringList parts = QString::fromLocal8Bit(raw).split(QLatin1Char('\t'));
+        if (parts.size() < 5)
             continue;
-        quint32 panePid = parts[0].toUInt();
+        const quint32 panePid = parts[0].toUInt();
         if (panePid == 0)
             continue;
-        // check if agentPid is in the PPid chain of panePid
-        quint32 c = agentPid;
-        bool found = (panePid == agentPid);
-        for (int i = 0; !found && i < 8; ++i) {
-            c = ppidOf(c);
-            if (c == panePid) found = true;
-        }
-        if (found) {
-            sessionId = parts[1];
-            break;
+
+        const int hop = chain.indexOf(panePid);
+        if (hop >= 0 && hop < bestHop) {
+            bestHop       = hop;
+            bestPanePid   = panePid;
+            bestSessionId   = parts[1];
+            bestSessionName = parts[2];
+            bestWindowIdx = parts[3].toInt();
+            bestPaneIdx   = parts[4].toInt();
         }
     }
-    if (sessionId.isEmpty())
+
+    if (bestHop == INT_MAX)
         return std::nullopt;
 
-    // tmux list-clients: get terminal PID for this session
+    // list-clients: find first valid client attached to this session
     QProcess clients;
     clients.start(QStringLiteral("tmux"),
-                  {QStringLiteral("list-clients"), QStringLiteral("-t"), sessionId,
-                   QStringLiteral("-F"), QStringLiteral("#{client_pid}")});
-    if (!clients.waitForFinished(1000))
+                  {QStringLiteral("list-clients"), QStringLiteral("-t"), bestSessionId,
+                   QStringLiteral("-F"), QStringLiteral("#{client_pid}\t#{client_tty}")});
+    if (!clients.waitForFinished(1000) || clients.exitCode() != 0)
         return std::nullopt;
 
+    TmuxPaneInfo info;
+    info.sessionId   = bestSessionId;
+    info.sessionName = bestSessionName;
+    info.windowIndex = bestWindowIdx;
+    info.paneIndex   = bestPaneIdx;
+    info.tmuxTarget  = QStringLiteral("%1:%2.%3")
+                           .arg(bestSessionId)
+                           .arg(bestWindowIdx)
+                           .arg(bestPaneIdx);
+
     for (const QByteArray &raw : clients.readAllStandardOutput().split('\n')) {
-        quint32 cpid = raw.trimmed().toUInt();
-        if (cpid > 1)
-            return cpid;
+        const QStringList parts = QString::fromLocal8Bit(raw).split(QLatin1Char('\t'));
+        if (parts.size() < 2)
+            continue;
+        const quint32 cpid = parts[0].toUInt();
+        const QString tty  = parts[1].trimmed();
+        if (cpid > 1 && !tty.isEmpty()) {
+            info.terminalPid = cpid;
+            info.clientTty   = tty;
+            return info;
+        }
     }
+
     return std::nullopt;
 }

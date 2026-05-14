@@ -32,6 +32,8 @@ struct AgentInfo {
     bool    sessionBusy = true;
     QString currentStep;
     QString windowAddress;
+    QString tmuxTarget;
+    QString tmuxClientTty;
 
     PulseState  pulseState = PulseState::Idle;
     QString     questionPrompt;
@@ -54,6 +56,7 @@ struct AgentInfo {
             && sessionId == o.sessionId && sessionName == o.sessionName
             && sessionBusy == o.sessionBusy && currentStep == o.currentStep
             && windowAddress == o.windowAddress
+            && tmuxTarget == o.tmuxTarget && tmuxClientTty == o.tmuxClientTty
             && pulseState == o.pulseState
             && questionPrompt == o.questionPrompt
             && questionOptions == o.questionOptions

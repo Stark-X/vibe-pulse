@@ -127,8 +127,11 @@ static QStringList enrichAgents(QVector<AgentInfo> &agents,
         }
         a.windowAddress = HyprlandClient::findWindowAddress(a.pid, wins);
         if (a.windowAddress.isEmpty()) {
-            if (auto tp = TmuxResolver::findTerminalPid(a.pid))
-                a.windowAddress = HyprlandClient::findWindowAddress(*tp, wins);
+            if (auto pi = TmuxResolver::findPaneInfo(a.pid)) {
+                a.windowAddress  = HyprlandClient::findWindowAddress(pi->terminalPid, wins);
+                a.tmuxTarget     = pi->tmuxTarget;
+                a.tmuxClientTty  = pi->clientTty;
+            }
         }
     }
 
