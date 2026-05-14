@@ -26,3 +26,20 @@
 
 **Files:** pulse/src/CodexMetaReader.h, pulse/src/CodexMetaReader.cpp, pulse/src/main.cpp
 
+
+---
+
+### ff774077 · 2026-05-14 · master
+
+**🐛 fix(resize): 乘以 devicePixelRatio 修复 QT_SCALE_FACTOR 下窗口无限收缩**
+
+**决策**
+- Hyprland `resizewindowpixel exact` 接受物理像素，而 Qt `QWindow::width()/height()` 在 `QT_SCALE_FACTOR!=1` 时返回逻辑像素；两处 `resizeWindow` 调用均需乘以 `devicePixelRatio` 转换
+- 选用 `qRound` 而非截断，避免累积误差导致 off-by-one
+
+**Bug 修复**
+- 症状：`QT_SCALE_FACTOR=1.2` 时 widget 持续收缩直到消失
+- 根因：逻辑像素传给 Hyprland 物理像素接口，导致窗口实际变小，Qt 读回更小的逻辑值，`heightChanged` 再次触发，形成正反馈收缩循环
+- 修复：在两处 `resizeWindow` 调用点乘以 `window->devicePixelRatio()`
+
+**文件**：`src/main.cpp`

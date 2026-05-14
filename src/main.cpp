@@ -249,9 +249,15 @@ int main(int argc, char **argv)
             const auto wins = HyprlandClient::clients();
             *selfAddr = HyprlandClient::findWindowAddress(
                 static_cast<quint32>(QCoreApplication::applicationPid()), wins);
-            // Trigger immediate resize once we have the address
-            if (!selfAddr->isEmpty())
-                HyprlandClient::resizeWindow(*selfAddr, window->width(), qMin(window->height(), 600));
+            // Trigger immediate resize once we have the address.
+            // Multiply by devicePixelRatio to convert logical→physical pixels;
+            // Hyprland resizewindowpixel expects physical pixels.
+            if (!selfAddr->isEmpty()) {
+                const qreal dpr = window->devicePixelRatio();
+                HyprlandClient::resizeWindow(*selfAddr,
+                    qRound(window->width()  * dpr),
+                    qRound(qMin(window->height(), 600) * dpr));
+            }
         });
         addrTimer->start();
 
@@ -261,8 +267,12 @@ int main(int argc, char **argv)
         QObject::connect(window, &QWindow::widthChanged,  resizeTimer, [resizeTimer]{ resizeTimer->start(); });
         QObject::connect(window, &QWindow::heightChanged, resizeTimer, [resizeTimer]{ resizeTimer->start(); });
         QObject::connect(resizeTimer, &QTimer::timeout, window, [selfAddr, window]() {
-            if (!selfAddr->isEmpty())
-                HyprlandClient::resizeWindow(*selfAddr, window->width(), qMin(window->height(), 600));
+            if (!selfAddr->isEmpty()) {
+                const qreal dpr = window->devicePixelRatio();
+                HyprlandClient::resizeWindow(*selfAddr,
+                    qRound(window->width()  * dpr),
+                    qRound(qMin(window->height(), 600) * dpr));
+            }
         });
     }
 
