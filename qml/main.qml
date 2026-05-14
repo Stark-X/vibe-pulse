@@ -23,10 +23,34 @@ Window {
     }
 
     width: widthByState[pulseState] ?? 380
-    height: header.height + (body.active && body.item ? body.item.implicitHeight + 8 : 8)
+    property real targetH: header.height + (body.active && body.item ? body.item.implicitHeight + 8 : 8)
+    property real animatedH: 52  // driven by heightAnim; Window.height binds to this
+    height: animatedH
 
     Behavior on width { NumberAnimation { duration: 280; easing.type: Easing.OutQuint } }
-    Behavior on height { NumberAnimation { duration: 280; easing.type: Easing.OutQuint } }
+
+    // Animate animatedH (a plain QML real), not Window.height directly.
+    // Window.height tracks animatedH via binding above.
+    // Expand: smooth 280ms; Collapse: instant (avoids blank-card flash).
+    NumberAnimation {
+        id: heightAnim
+        target: root
+        property: "animatedH"
+        duration: 280
+        easing.type: Easing.OutQuint
+    }
+
+    onTargetHChanged: {
+        if (body.active) {
+            heightAnim.stop()
+            heightAnim.from = root.animatedH
+            heightAnim.to = targetH
+            heightAnim.start()
+        } else {
+            heightAnim.stop()
+            root.animatedH = targetH
+        }
+    }
 
     Rectangle {
         id: card
@@ -80,8 +104,7 @@ Window {
             anchors.top: header.bottom
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 8
+            height: active && item ? item.implicitHeight : 0  // decouple from window animation; parent.bottom caused footer at y<0 on first frame
             active: pulseState !== "idle" && pulseState !== "working"
             sourceComponent: {
                 if (pulseState === "permission") return permComp
@@ -119,5 +142,6 @@ Window {
     Component.onCompleted: {
         Theme.name = appSettings.theme
         Theme.shape = appSettings.shape
+        root.animatedH = targetH
     }
 }
