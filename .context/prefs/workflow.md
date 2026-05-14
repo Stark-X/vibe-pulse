@@ -9,7 +9,7 @@
 1. 理解需求，分析影响范围
 2. 读取现有代码，理解模式
 3. 编写实现代码
-4. `cargo check` / `bun run build` 验证
+4. `make build` 验证编译通过
 5. 手动验证热重载效果
 6. 更新 OpenSpec 文档（若 API 变更）
 

@@ -1,18 +1,26 @@
 # Pulse — AI Agent Monitor
 
-Tauri 2 floating overlay for monitoring AI coding agents (Claude Code, Codex, OpenCode) on Ubuntu 24.04 + Hyprland.
+Qt6/QML floating overlay for monitoring AI coding agents (Claude Code, Codex, OpenCode) on Ubuntu 24.04 + Hyprland.
 
 ## Stack
-- Backend: Rust + Tauri 2 + sysinfo
-- Frontend: Vanilla JS (no framework) + Vite
-- Package manager: bun
+- Backend: C++ + Qt6 + sysinfo (via /proc)
+- Frontend: QML (Qt Quick)
+- Build: CMake
 
 ## Dev Commands
 ```bash
-bun run tauri dev    # hot-reload dev mode
-bun run build        # frontend only
-bun run tauri build  # production binary
-cargo check          # Rust compile check (run from src-tauri/)
+make build   # cmake --build build_rel --target pulse
+make run     # build + run
+make toggle  # build + run pulse-toggle
+make clean   # clean build artifacts
+
+# Mock preview scenes
+make mock-idle
+make mock-working
+make mock-permission
+make mock-question
+make mock-plan
+make mock-expanded
 ```
 
 ## .context 项目上下文
