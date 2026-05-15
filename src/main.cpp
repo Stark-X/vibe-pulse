@@ -77,9 +77,16 @@ static QVector<AgentInfo> buildMockSnapshot(const QString &scenario)
         agents << a;
     } else {
         // "expanded" — multiple agents
-        agents << mkAgent("vibe-island",  "Claude Code", "Writing unit tests",    PulseState::Working);
-        agents << mkAgent("nova-sdk",     "Codex",       "Refactoring auth flow", PulseState::Working);
-        agents << mkAgent("deepbank-fe",  "Claude Code", "",                      PulseState::Idle, false);
+        AgentInfo a1 = mkAgent("vibe-island",  "Claude Code", "Writing unit tests",    PulseState::Working);
+        a1.contextUsed  = 45000;
+        a1.contextLimit = 200000;
+        agents << a1;
+        AgentInfo a2 = mkAgent("nova-sdk",     "Codex",       "Refactoring auth flow", PulseState::Working);
+        agents << a2;
+        AgentInfo a3 = mkAgent("deepbank-fe",  "Claude Code", "",                      PulseState::Idle, false);
+        a3.contextUsed  = 155000;
+        a3.contextLimit = 200000;
+        agents << a3;
         agents << mkAgent("api-gateway",  "Codex",       "",                      PulseState::Idle, false);
     }
 
@@ -112,6 +119,8 @@ static QStringList enrichAgents(QVector<AgentInfo> &agents,
             a.permissionTarget= m.permissionTarget;
             a.permissionDesc  = m.permissionDesc;
             a.interactionId   = m.interactionId;
+            a.contextUsed     = m.contextUsed;
+            a.contextLimit    = m.contextLimit;
             if (!m.cwd.isEmpty()) {
                 a.cwd  = m.cwd;
                 a.name = QFileInfo(m.cwd).fileName();
@@ -119,11 +128,13 @@ static QStringList enrichAgents(QVector<AgentInfo> &agents,
         }
         if (a.toolType == QStringLiteral("Codex")) {
             CodexMeta cm = CodexMetaReader::read(a.pid, &newPaths);
-            a.sessionId   = cm.sessionId;
-            a.sessionName = cm.sessionName;
-            a.sessionBusy = cm.sessionBusy;
-            a.currentStep = cm.currentStep;
-            a.pulseState  = cm.pulseState;
+            a.sessionId    = cm.sessionId;
+            a.sessionName  = cm.sessionName;
+            a.sessionBusy  = cm.sessionBusy;
+            a.currentStep  = cm.currentStep;
+            a.pulseState   = cm.pulseState;
+            a.contextUsed  = cm.contextUsed;
+            a.contextLimit = cm.contextLimit;
         }
         a.windowAddress = HyprlandClient::findWindowAddress(a.pid, wins);
         if (a.windowAddress.isEmpty()) {

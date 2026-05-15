@@ -10,6 +10,8 @@ struct CodexMeta {
     bool       sessionBusy = true;
     QString    currentStep;
     PulseState pulseState = PulseState::Idle;
+    int        contextUsed  = 0;
+    int        contextLimit = 0;
 };
 
 class CodexMetaReader

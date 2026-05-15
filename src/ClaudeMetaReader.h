@@ -21,6 +21,8 @@ struct ClaudeMeta {
     QString     permissionTarget;
     QString     permissionDesc;
     QString     interactionId;
+    int         contextUsed  = 0;
+    int         contextLimit = 0;
 };
 
 class ClaudeMetaReader

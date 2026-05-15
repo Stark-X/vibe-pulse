@@ -10,6 +10,41 @@
 #include <QJsonValue>
 #include <QStringList>
 
+static constexpr int kClaudeContextLimit = 200000;
+
+namespace {
+struct ContextUsage { int used = 0; int limit = 0; };
+
+ContextUsage parseContextUsage(const QByteArray &tail)
+{
+    const QList<QByteArray> lines = tail.split('\n');
+    for (int i = lines.size() - 1; i >= 0; --i) {
+        const QByteArray raw = lines[i].trimmed();
+        if (raw.isEmpty())
+            continue;
+        QJsonParseError err;
+        const QJsonDocument doc = QJsonDocument::fromJson(raw, &err);
+        if (err.error != QJsonParseError::NoError)
+            continue;
+        const QJsonObject obj = doc.object();
+        if (obj.value(QStringLiteral("type")).toString() != QStringLiteral("assistant"))
+            continue;
+        const QJsonObject usage = obj.value(QStringLiteral("message"))
+                                     .toObject()
+                                     .value(QStringLiteral("usage"))
+                                     .toObject();
+        if (usage.isEmpty())
+            continue;
+        const qint64 used = static_cast<qint64>(usage.value(QStringLiteral("input_tokens")).toInt())
+                          + static_cast<qint64>(usage.value(QStringLiteral("cache_creation_input_tokens")).toInt())
+                          + static_cast<qint64>(usage.value(QStringLiteral("cache_read_input_tokens")).toInt());
+        return { static_cast<int>(qMin(used, static_cast<qint64>(kClaudeContextLimit))),
+                 kClaudeContextLimit };
+    }
+    return {};
+}
+} // namespace
+
 static QString encodeCwd(const QString &cwd)
 {
     QString enc = cwd;
@@ -238,6 +273,9 @@ ClaudeMeta ClaudeMetaReader::read(quint32 pid, const QString &cwd,
         const QString usedCwd = m.cwd.isEmpty() ? cwd : m.cwd;
         const QByteArray tail = readTail(transcriptPath(home, usedCwd, m.sessionId),
                                          32768, watchPaths);
+        const ContextUsage cu = parseContextUsage(tail);
+        m.contextUsed  = cu.used;
+        m.contextLimit = cu.limit;
         const Interaction ix = lastClaudeInteraction(tail);
 
         if (ix.kind == Interaction::Question) {
@@ -276,7 +314,11 @@ ClaudeMeta ClaudeMetaReader::read(quint32 pid, const QString &cwd,
 
     const QString usedCwd = sobj.value(QStringLiteral("cwd")).toString();
     const QString txPath = transcriptPath(home, usedCwd.isEmpty() ? cwd : usedCwd, m.sessionId);
-    m.currentStep = lastToolUse(readTail(txPath, 8192, watchPaths));
+    const QByteArray tail = readTail(txPath, 32768, watchPaths);
+    const ContextUsage cu = parseContextUsage(tail);
+    m.contextUsed  = cu.used;
+    m.contextLimit = cu.limit;
+    m.currentStep = lastToolUse(tail);
     m.pulseState  = PulseState::Working;
     return m;
 }

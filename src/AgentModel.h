@@ -36,6 +36,8 @@ public:
         PermissionTargetRole,
         PermissionDescRole,
         InteractionIdRole,
+        ContextUsedRole,
+        ContextLimitRole,
     };
     Q_ENUM(Roles)
 

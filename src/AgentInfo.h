@@ -45,6 +45,8 @@ struct AgentInfo {
     QString     permissionTarget;
     QString     permissionDesc;
     QString     interactionId;
+    int         contextUsed  = 0;
+    int         contextLimit = 0;
 
     bool operator==(const AgentInfo &o) const noexcept {
         return pid == o.pid && toolType == o.toolType;
@@ -66,7 +68,9 @@ struct AgentInfo {
             && permissionTool == o.permissionTool
             && permissionTarget == o.permissionTarget
             && permissionDesc == o.permissionDesc
-            && interactionId == o.interactionId;
+            && interactionId == o.interactionId
+            && contextUsed  == o.contextUsed
+            && contextLimit == o.contextLimit;
     }
 };
 

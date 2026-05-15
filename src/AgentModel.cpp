@@ -65,6 +65,8 @@ QHash<int, QByteArray> AgentModel::roleNames() const
         { PermissionTargetRole,"permissionTarget"},
         { PermissionDescRole,  "permissionDesc"  },
         { InteractionIdRole,   "interactionId"   },
+        { ContextUsedRole,     "contextUsed"     },
+        { ContextLimitRole,    "contextLimit"    },
     };
 }
 
@@ -95,6 +97,8 @@ QVariant AgentModel::data(const QModelIndex &idx, int role) const
     case PermissionTargetRole:return a.permissionTarget;
     case PermissionDescRole:  return a.permissionDesc;
     case InteractionIdRole:   return a.interactionId;
+    case ContextUsedRole:     return a.contextUsed;
+    case ContextLimitRole:    return a.contextLimit;
     default:                  return {};
     }
 }
@@ -129,6 +133,8 @@ QVariantMap AgentModel::get(int row) const
         { QStringLiteral("permissionTarget"),a.permissionTarget },
         { QStringLiteral("permissionDesc"),  a.permissionDesc   },
         { QStringLiteral("interactionId"),   a.interactionId    },
+        { QStringLiteral("contextUsed"),     a.contextUsed      },
+        { QStringLiteral("contextLimit"),    a.contextLimit     },
     };
 }
 

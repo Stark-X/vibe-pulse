@@ -70,6 +70,29 @@ Item {
                             opacity: 0.5
                         }
 
+                        // Context usage slim bar
+                        Item {
+                            visible: model.contextUsed > 0 && model.contextLimit > 0
+                            anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                            height: 2
+
+                            readonly property real usageRatio:
+                                model.contextLimit > 0
+                                    ? Math.min(model.contextUsed / model.contextLimit, 1.0)
+                                    : 0
+
+                            Rectangle {
+                                anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
+                                width: parent.width * parent.usageRatio
+                                color: parent.usageRatio > 0.9 ? Theme.coral
+                                     : parent.usageRatio > 0.7 ? "#f59e0b"
+                                     : Theme.accent
+                                opacity: 0.75
+                                Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
+                                Behavior on color { ColorAnimation  { duration: 300 } }
+                            }
+                        }
+
                         MouseArea {
                             id: rowHov
                             anchors.fill: parent

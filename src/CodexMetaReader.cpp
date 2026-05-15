@@ -94,7 +94,7 @@ CodexMeta CodexMetaReader::read(quint32 pid, QStringList *watchPaths)
     if (watchPaths) *watchPaths << sessionFile;
 
     const qint64 size = f.size();
-    const qint64 tailSize = 4096;
+    const qint64 tailSize = 16384;
     if (size > tailSize)
         f.seek(size - tailSize);
 
@@ -120,6 +120,8 @@ CodexMeta CodexMetaReader::read(quint32 pid, QStringList *watchPaths)
     QString lastCmd;
     QString lastAgentMsg;
     bool taskCompletedAfterCmd = false;
+    int contextUsed  = 0;
+    int contextLimit = 0;
 
     for (const QByteArray &raw : tail.split('\n')) {
         const QByteArray line = raw.trimmed();
@@ -130,11 +132,24 @@ CodexMeta CodexMetaReader::read(quint32 pid, QStringList *watchPaths)
         if (err.error != QJsonParseError::NoError) continue;
 
         const QJsonObject obj = doc.object();
-        if (obj.value(QStringLiteral("type")).toString() != QStringLiteral("response_item"))
-            continue;
-
+        const QString objType = obj.value(QStringLiteral("type")).toString();
         const QJsonObject payload = obj.value(QStringLiteral("payload")).toObject();
         const QString ptype = payload.value(QStringLiteral("type")).toString();
+
+        if (objType == QStringLiteral("event_msg") && ptype == QStringLiteral("token_count")) {
+            const QJsonObject info = payload.value(QStringLiteral("info")).toObject();
+            const QJsonObject lastUsage = info.value(QStringLiteral("last_token_usage")).toObject();
+            const int used  = lastUsage.value(QStringLiteral("input_tokens")).toInt();
+            const int limit = info.value(QStringLiteral("model_context_window")).toInt();
+            if (used > 0 && limit > 0) {
+                contextUsed  = used;
+                contextLimit = limit;
+            }
+            continue;
+        }
+
+        if (objType != QStringLiteral("response_item"))
+            continue;
 
         if (ptype == QStringLiteral("function_call")) {
             const QString step = summarise(payload);
@@ -149,6 +164,9 @@ CodexMeta CodexMetaReader::read(quint32 pid, QStringList *watchPaths)
             taskCompletedAfterCmd = true;
         }
     }
+
+    m.contextUsed  = contextUsed;
+    m.contextLimit = contextLimit;
 
     // If the turn completed after the last command, Codex is now waiting for
     // user input (idle or asking a question).  Show the agent's last message
