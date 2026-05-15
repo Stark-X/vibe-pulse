@@ -1,5 +1,7 @@
 #include <unistd.h>
 
+#include <signal.h>
+
 #include <QDir>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
@@ -319,6 +321,17 @@ int main(int argc, char **argv)
             conn->deleteLater();
         });
     });
+
+    // ── graceful shutdown ──────────────────────────────────────────────────────
+    QObject::connect(&app, &QGuiApplication::aboutToQuit, &app, [scanner, server, &socketPath]() {
+        scanner->stop();
+        server->close();
+        QLocalServer::removeServer(socketPath);
+    });
+
+    // SIGTERM/SIGINT → graceful quit (ensures aboutToQuit fires)
+    signal(SIGTERM, [](int) { QCoreApplication::quit(); });
+    signal(SIGINT,  [](int) { QCoreApplication::quit(); });
 
     if (!isMock)
         scanner->start();

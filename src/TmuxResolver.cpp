@@ -54,7 +54,8 @@ std::optional<TmuxPaneInfo> TmuxResolver::findPaneInfo(quint32 agentPid)
                 {QStringLiteral("list-panes"), QStringLiteral("-a"),
                  QStringLiteral("-F"),
                  QStringLiteral("#{pane_pid}\t#{session_id}\t#{session_name}\t#{window_index}\t#{pane_index}")});
-    if (!panes.waitForFinished(1000) || panes.exitCode() != 0)
+    if (!panes.waitForFinished(1000)) { panes.kill(); panes.waitForFinished(100); return std::nullopt; }
+    if (panes.exitCode() != 0)
         return std::nullopt;
 
     int     bestHop       = INT_MAX;
@@ -91,7 +92,8 @@ std::optional<TmuxPaneInfo> TmuxResolver::findPaneInfo(quint32 agentPid)
     clients.start(QStringLiteral("tmux"),
                   {QStringLiteral("list-clients"), QStringLiteral("-t"), bestSessionId,
                    QStringLiteral("-F"), QStringLiteral("#{client_pid}\t#{client_tty}")});
-    if (!clients.waitForFinished(1000) || clients.exitCode() != 0)
+    if (!clients.waitForFinished(1000)) { clients.kill(); clients.waitForFinished(100); return std::nullopt; }
+    if (clients.exitCode() != 0)
         return std::nullopt;
 
     TmuxPaneInfo info;

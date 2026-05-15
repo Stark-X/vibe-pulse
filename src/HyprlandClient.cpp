@@ -31,7 +31,8 @@ QVector<HyprWindow> HyprlandClient::clients()
 
     QProcess p;
     p.start(QStringLiteral("hyprctl"), {QStringLiteral("clients"), QStringLiteral("-j")});
-    if (!p.waitForFinished(1000) || p.exitCode() != 0)
+    if (!p.waitForFinished(1000)) { p.kill(); p.waitForFinished(100); return {}; }
+    if (p.exitCode() != 0)
         return {};
 
     QJsonParseError err;
@@ -64,8 +65,7 @@ QString HyprlandClient::focusWindow(const QString &address)
     p.start(QStringLiteral("hyprctl"),
             {QStringLiteral("dispatch"), QStringLiteral("focuswindow"),
              QStringLiteral("address:") + address});
-    if (!p.waitForFinished(1000))
-        return QStringLiteral("timeout");
+    if (!p.waitForFinished(1000)) { p.kill(); p.waitForFinished(100); return QStringLiteral("timeout"); }
     if (p.exitCode() != 0)
         return QString::fromLocal8Bit(p.readAllStandardError()).trimmed();
     return {};

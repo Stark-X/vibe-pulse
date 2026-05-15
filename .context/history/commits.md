@@ -68,3 +68,11 @@
 - contextLimit 在 ClaudeMetaReader 中硬编码为 kClaudeContextLimit=200000（所有当前 Claude 模型均为 200k）
 - bar 叠加在 bottom separator 之上（height:2，visible 仅在 contextUsed>0），行高保持 62px 不变
 **Files**: src/AgentInfo.h, src/ClaudeMetaReader.h, src/ClaudeMetaReader.cpp, src/CodexMetaReader.h, src/CodexMetaReader.cpp, src/AgentModel.h, src/AgentModel.cpp, src/main.cpp, qml/ExpandedView.qml
+
+## 2026-05-15 — 🛡️ fix(proc): 进程退出加固——aboutToQuit 清理、SIGTERM/SIGINT 捕获、QProcess 超时 kill
+**Branch**: master
+**Decisions**:
+- 连接 QGuiApplication::aboutToQuit 信号，退出时停止 ProcScanner 定时器、关闭 IPC 套接字并删除套接字文件，防止 /tmp/pulse-<uid>.sock 残留
+- 注册 SIGTERM/SIGINT 处理函数调用 QCoreApplication::quit()，确保信号杀进程时 aboutToQuit 仍能触发
+- HyprlandClient 和 TmuxResolver 的 QProcess waitForFinished 超时后调用 kill() + waitForFinished(100)，防止卡死的 hyprctl/tmux 子进程成为孤儿
+**Files**: src/main.cpp, src/HyprlandClient.cpp, src/TmuxResolver.cpp
