@@ -10,8 +10,18 @@ Item {
     property string agentTool: ""
     property int agentCount: 0
     property string liveTime: ""
+    property double claudeUtilization: 0
+    property double codexUtilization:  0
+    property bool   claudeAvailable:   false
+    property bool   codexAvailable:    false
 
     signal clicked()
+
+    function usageColor(pct) {
+        if (pct > 85) return Theme.coral
+        if (pct > 60) return Theme.peach
+        return Theme.text2
+    }
 
     // State → indicator color: idle=green, working=cyan, others=coral
     readonly property color stateColor: {
@@ -69,8 +79,8 @@ Item {
     Column {
         anchors.left: heartArea.right
         anchors.leftMargin: 4
-        anchors.right: metaArea.left
-        anchors.rightMargin: 10
+        anchors.right: usageRow.left
+        anchors.rightMargin: 6
         anchors.verticalCenter: parent.verticalCenter
         spacing: 2
 
@@ -113,6 +123,33 @@ Item {
                 interval: 16
                 onTriggered: subText.opacity = 1
             }
+        }
+    }
+
+    // Subscription usage indicators (idle/working only, optional)
+    Row {
+        id: usageRow
+        anchors.right: metaArea.left
+        anchors.rightMargin: 4
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 4
+
+        Text {
+            visible: claudeAvailable && (pulseState === "idle" || pulseState === "working")
+            text: "CC " + Math.round(claudeUtilization) + "%"
+            font.family: "JetBrains Mono"
+            font.pixelSize: 9
+            color: root.usageColor(claudeUtilization)
+            verticalAlignment: Text.AlignVCenter
+        }
+
+        Text {
+            visible: codexAvailable && (pulseState === "idle" || pulseState === "working")
+            text: "CD " + Math.round(codexUtilization) + "%"
+            font.family: "JetBrains Mono"
+            font.pixelSize: 9
+            color: root.usageColor(codexUtilization)
+            verticalAlignment: Text.AlignVCenter
         }
     }
 

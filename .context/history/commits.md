@@ -83,3 +83,16 @@
 - 右侧 chip Loader 切换时淡出→淡入 200ms
 - 副标题文字变化时淡出→淡入，颜色 250ms
 - Context-Id: 6c959316-b087-4e97-8f36-f216698a7da3
+
+## 2026-05-15 — ✨ feat(ui): 在 HeaderBar 展示 Claude Code 和 Codex 官方订阅用量
+**Branch**: master
+**Decisions**:
+- 新增独立 SubscriptionMonitor C++ 类，不并入 AgentModel，保持关注点分离
+- 仅在官方 OAuth 模式下显示（Claude: claudeAiOauth.accessToken；Codex: auth_mode==chatgpt）
+- 每次 poll 前重读凭据文件，支持 CLI 自动 token 刷新后无需重启 Pulse
+- API 失败立即隐藏（available=false），不保留 stale 旧值
+- 启动延迟 5 秒 + 5 分钟定时轮询，避免阻塞启动
+- 使用 qEnvironmentVariableIsSet 而非 isEmpty 判断 mock 模式，正确处理空值 env var
+- usageRow 通过 Row child visible 控制折叠，空时 width=0，自动让出 Column 空间
+**Files**: src/SubscriptionMonitor.h, src/SubscriptionMonitor.cpp, src/main.cpp, qml/HeaderBar.qml, qml/main.qml, CMakeLists.txt, Makefile, openspec/changes/header-subscription-usage/
+- Context-Id: d6a66d8b-184a-4886-8d34-40da001ea2d8

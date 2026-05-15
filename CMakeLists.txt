@@ -46,6 +46,7 @@ qt_add_executable(pulse
     src/Settings.h        src/Settings.cpp
     src/MiniMd.h          src/MiniMd.cpp
     src/ResponseWriter.h  src/ResponseWriter.cpp
+    src/SubscriptionMonitor.h src/SubscriptionMonitor.cpp
     ${PULSE_PROTOCOL_CODE}
     ${PULSE_PROTOCOL_HEADER}
 )

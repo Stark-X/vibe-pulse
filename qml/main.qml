@@ -118,6 +118,10 @@ Window {
             agentTool: agentModel.activeAgentRow >= 0 ? (agentModel.get(agentModel.activeAgentRow).permissionTool ?? "") : ""
             agentCount: agentModel.count
             liveTime: clockTimer.timeStr
+            claudeUtilization: subscriptionMonitor.claudeUtilization
+            codexUtilization:  subscriptionMonitor.codexUtilization
+            claudeAvailable:   subscriptionMonitor.claudeAvailable
+            codexAvailable:    subscriptionMonitor.codexAvailable
             onClicked: root.userExpanded = !root.userExpanded
         }
 

@@ -2,7 +2,8 @@ BUILD := build_rel
 BIN   := $(BUILD)/pulse
 
 .PHONY: build run toggle clean \
-        mock mock-idle mock-working mock-permission mock-question mock-plan mock-expanded
+        mock mock-idle mock-working mock-permission mock-question mock-plan mock-expanded \
+        mock-subscription
 
 build:
 	cmake --build $(BUILD) --target pulse
@@ -45,3 +46,6 @@ mock-plan: build
 
 mock-expanded: build
 	PULSE_MOCK=expanded $(BIN)
+
+mock-subscription: build
+	PULSE_MOCK=working PULSE_MOCK_SUBSCRIPTION=CC=45,CD=31 $(BIN)

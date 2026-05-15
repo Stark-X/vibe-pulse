@@ -22,6 +22,7 @@
 #include "HyprlandClient.h"
 #include "ProcScanner.h"
 #include "Settings.h"
+#include "SubscriptionMonitor.h"
 #include "TmuxResolver.h"
 #include "WaylandLayerShell.h"
 
@@ -181,6 +182,7 @@ int main(int argc, char **argv)
     auto *model    = new AgentModel(&app);
     auto *settings = new Settings(&app);
     auto *scanner  = new ProcScanner(&app);
+    auto *subMon   = new SubscriptionMonitor(&app);
 
     // ── live meta watcher ─────────────────────────────────────────────────────
     // Watches session files + active JSONL transcripts.
@@ -233,6 +235,7 @@ int main(int argc, char **argv)
     engine.addImportPath(QStringLiteral("qrc:/"));
     engine.rootContext()->setContextProperty(QStringLiteral("agentModel"),  model);
     engine.rootContext()->setContextProperty(QStringLiteral("appSettings"), settings);
+    engine.rootContext()->setContextProperty(QStringLiteral("subscriptionMonitor"), subMon);
     engine.rootContext()->setContextProperty(QStringLiteral("mockForceExpanded"),
         QVariant(mockScenario == QStringLiteral("expanded")));
 
@@ -257,6 +260,7 @@ int main(int argc, char **argv)
         qWarning("pulse: layer-shell unavailable, running as normal window");
 
     component.completeCreate();
+    subMon->start();
     window->show();
 
     // Resize via Hyprland IPC. The original 'dispatch pin ; resizewindowpixel ; dispatch pin'
