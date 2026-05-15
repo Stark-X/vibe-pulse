@@ -74,8 +74,10 @@ QString HyprlandClient::focusWindow(const QString &address)
 void HyprlandClient::resizeWindow(const QString &address, int width, int height)
 {
     if (address.isEmpty() || !available()) return;
-    const QString cmd = QStringLiteral("dispatch pin address:%1 ; dispatch resizewindowpixel exact %2 %3,address:%1 ; dispatch pin address:%1")
-        .arg(address).arg(width).arg(height);
+    // No 'dispatch pin' wrapper — it causes layer-shell windows to temporarily lose
+    // compositor state, which can leave a stale large blank window after collapse.
+    const QString cmd = QStringLiteral("dispatch resizewindowpixel exact %1 %2,address:%3")
+        .arg(width).arg(height).arg(address);
     QProcess::startDetached(QStringLiteral("hyprctl"), {QStringLiteral("--batch"), cmd});
 }
 

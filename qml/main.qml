@@ -18,22 +18,41 @@ Window {
         "working": 380,
         "permission": 420,
         "question": 420,
-        "plan": 460,
-        "expanded": 420
+        "plan": 460
     }
 
-    width: widthByState[pulseState] ?? 380
-    // expanded: ExpandedView footer is at bottom, no extra margin needed
-    property real targetH: header.height + (body.active && body.item
-        ? body.item.implicitHeight + (pulseState === "expanded" ? 0 : 8)
-        : 8)
-    property real animatedH: 52  // driven by heightAnim; Window.height binds to this
+    // When expanded, inherit the underlying backend state's width so clicking the
+    // header doesn't change the window width.
+    width: widthByState[pulseState === "expanded"
+        ? (agentModel.idleCollapsed ? "idle" : backendState)
+        : pulseState] ?? 380
+
+    // Height management:
+    //   _stableBodyH — last real implicitHeight from the loaded item (> 60 → valid).
+    //                  Reset to 0 each time body activates so the fresh item drives
+    //                  the animation, not the previous item's stale value.
+    //   _holdH       — animatedH snapshot taken when body activates.
+    //                  While _stableBodyH == 0 (item not yet laid out), targetH returns
+    //                  _holdH so no spurious animation fires before the item is ready.
+    //
+    // Why this matters: QML Column/positioner implicitHeight is lazy (polished on first
+    // render cycle). ExpandedView reports implicitH=32 (footer-only) at onLoaded time,
+    // then fires implicitHeightChanged with the real value (~280) one frame later.
+    // Without this guard the window would stutter 52→76→324 on each expand.
+    property real _stableBodyH: 0
+    property real _holdH:       52   // set in onActiveChanged(active=true)
+
+    property real targetH: {
+        if (!body.active)         return header.height + 8
+        if (_stableBodyH <= 0)    return _holdH          // hold until layout settles
+        return header.height + _stableBodyH + (pulseState === "expanded" ? 0 : 8)
+    }
+    property real animatedH: 52
     height: animatedH
 
     Behavior on width { NumberAnimation { duration: 280; easing.type: Easing.OutQuint } }
 
     // Animate animatedH (a plain QML real), not Window.height directly.
-    // Window.height tracks animatedH via binding above.
     // Expand: smooth 280ms; Collapse: instant (avoids blank-card flash).
     NumberAnimation {
         id: heightAnim
@@ -53,6 +72,16 @@ Window {
             heightAnim.stop()
             root.animatedH = targetH
         }
+    }
+
+    // Hyprland's resizewindowpixel IPC can arrive after a QML collapse, overriding
+    // Window.height and breaking the "height: animatedH" binding.  When we detect
+    // a mismatch we restore the binding via Qt.binding() so animatedH stays in
+    // control.  The C++ resizeTimer will then read the corrected height and send
+    // the right resizewindowpixel call to Hyprland within 100 ms.
+    onHeightChanged: {
+        if (Math.abs(height - animatedH) > 2)
+            root.height = Qt.binding(function() { return root.animatedH; })
     }
 
     Rectangle {
@@ -120,17 +149,40 @@ Window {
                 return null
             }
 
+            onActiveChanged: {
+                if (!active) {
+                    // Collapse: instant snap, reset tracking
+                    heightAnim.stop()
+                    root.animatedH = header.height + 8
+                    root._stableBodyH = 0
+                } else {
+                    // Capture current animatedH as hold value before item loads.
+                    root._holdH = root.animatedH
+                    root._stableBodyH = 0
+                }
+            }
+
             onLoaded: {
+                if (item.implicitHeight > 60)
+                    root._stableBodyH = item.implicitHeight
+
+                item.implicitHeightChanged.connect(function() {
+                    if (body.item && body.active && body.item.implicitHeight > 0)
+                        root._stableBodyH = body.item.implicitHeight
+                })
+
                 item.opacity = 0
                 item.y = -6
+                bodyOpacAnim.target = item
+                bodySlideAnim.target = item
                 bodyAnim.start()
             }
         }
 
         ParallelAnimation {
             id: bodyAnim
-            NumberAnimation { target: body.item; property: "opacity"; to: 1; duration: 200; easing.type: Easing.OutCubic }
-            NumberAnimation { target: body.item; property: "y"; to: 0; duration: 200; easing.type: Easing.OutCubic }
+            NumberAnimation { id: bodyOpacAnim; property: "opacity"; to: 1; duration: 200; easing.type: Easing.OutCubic }
+            NumberAnimation { id: bodySlideAnim; property: "y"; to: 0; duration: 200; easing.type: Easing.OutCubic }
         }
     }
 
@@ -149,5 +201,6 @@ Window {
         Theme.name = appSettings.theme
         Theme.shape = appSettings.shape
         root.animatedH = targetH
+        root._holdH = root.animatedH
     }
 }

@@ -259,8 +259,9 @@ int main(int argc, char **argv)
     component.completeCreate();
     window->show();
 
-    // Resize via Hyprland IPC (the only reliable way for layer-shell windows).
-    // We poll for our own window address once, then resize on geometry changes.
+    // Resize via Hyprland IPC. The original 'dispatch pin ; resizewindowpixel ; dispatch pin'
+    // trick caused layer-shell windows to temporarily lose compositor state after a collapse,
+    // leaving a stale large blank window. Now we use resizewindowpixel directly (no pin).
     if (HyprlandClient::available()) {
         auto *selfAddr  = new QString();
         auto *addrTimer = new QTimer(window);
@@ -271,9 +272,6 @@ int main(int argc, char **argv)
             const auto wins = HyprlandClient::clients();
             *selfAddr = HyprlandClient::findWindowAddress(
                 static_cast<quint32>(QCoreApplication::applicationPid()), wins);
-            // Trigger immediate resize once we have the address.
-            // Multiply by devicePixelRatio to convert logical→physical pixels;
-            // Hyprland resizewindowpixel expects physical pixels.
             if (!selfAddr->isEmpty()) {
                 const qreal dpr = window->devicePixelRatio();
                 HyprlandClient::resizeWindow(*selfAddr,

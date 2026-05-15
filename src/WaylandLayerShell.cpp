@@ -122,14 +122,14 @@ void WaylandLayerShell::requestResize(int width, int height)
 {
     if (!m_valid || !m_window)
         return;
+    m_pendingW = width;
+    m_pendingH = height;
+    m_resizePending = true;
     // Only resize via QWindow — do NOT call zwlr_layer_surface_v1_set_size
     // or wl_surface_commit here. Qt's Wayland backend owns the display
     // connection; calling libwayland-client APIs concurrently crashes.
     // Instead, store the pending size and apply it during the next
     // configure callback from the compositor.
-    m_pendingW = width;
-    m_pendingH = height;
-    m_resizePending = true;
     m_window->resize(width, height);
 }
 
