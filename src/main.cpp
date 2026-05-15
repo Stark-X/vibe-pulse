@@ -119,8 +119,10 @@ static QStringList enrichAgents(QVector<AgentInfo> &agents,
             a.permissionTarget= m.permissionTarget;
             a.permissionDesc  = m.permissionDesc;
             a.interactionId   = m.interactionId;
-            a.contextUsed     = m.contextUsed;
-            a.contextLimit    = m.contextLimit;
+            if (m.contextUsed > 0) {
+                a.contextUsed  = m.contextUsed;
+                a.contextLimit = m.contextLimit;
+            }
             if (!m.cwd.isEmpty()) {
                 a.cwd  = m.cwd;
                 a.name = QFileInfo(m.cwd).fileName();
@@ -133,8 +135,10 @@ static QStringList enrichAgents(QVector<AgentInfo> &agents,
             a.sessionBusy  = cm.sessionBusy;
             a.currentStep  = cm.currentStep;
             a.pulseState   = cm.pulseState;
-            a.contextUsed  = cm.contextUsed;
-            a.contextLimit = cm.contextLimit;
+            if (cm.contextUsed > 0) {
+                a.contextUsed  = cm.contextUsed;
+                a.contextLimit = cm.contextLimit;
+            }
         }
         a.windowAddress = HyprlandClient::findWindowAddress(a.pid, wins);
         if (a.windowAddress.isEmpty()) {
