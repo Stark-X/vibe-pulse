@@ -4,17 +4,15 @@ import qml 1.0
 Item {
     id: root
     width: parent ? parent.width : 0
-    implicitHeight: Math.min(content.implicitHeight, 280) + foot.height
+    // implicitHeight drives auto-resize: cap list at 280, add footer
+    implicitHeight: Math.min(content.contentHeight, 280) + foot.height
 
     Flickable {
         id: content
-        anchors { top: parent.top; left: parent.left; right: parent.right }
-        height: Math.min(implicitHeight, 280)
+        anchors { top: parent.top; left: parent.left; right: parent.right; bottom: foot.top }
         contentWidth: width
         contentHeight: listCol.implicitHeight
         clip: true
-
-        property real implicitHeight: listCol.implicitHeight
 
         // Subtle scrollbar
         Rectangle {
@@ -206,6 +204,32 @@ Item {
                     }
                 }
             }
+        }
+    }
+
+    // Overflow gradient overlay — shown when Flickable clips hidden agents
+    Item {
+        visible: content.contentHeight > content.height
+        z: 2
+        anchors { bottom: content.bottom; left: parent.left; right: parent.right }
+        height: 52
+
+        Rectangle {
+            anchors.fill: parent
+            gradient: Gradient {
+                GradientStop { position: 0.0;  color: Qt.rgba(Theme.bg0.r, Theme.bg0.g, Theme.bg0.b, 0.0)  }
+                GradientStop { position: 0.55; color: Qt.rgba(Theme.bg0.r, Theme.bg0.g, Theme.bg0.b, 0.87) }
+                GradientStop { position: 1.0;  color: Qt.rgba(Theme.bg0.r, Theme.bg0.g, Theme.bg0.b, 1.0)  }
+            }
+        }
+
+        Text {
+            anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: 7 }
+            text: "↓  " + Math.ceil((content.contentHeight - content.height) / 62) + " more"
+            font.pixelSize: 10
+            font.letterSpacing: 0.5
+            font.weight: Font.Medium
+            color: Qt.rgba(1, 1, 1, 0.42)
         }
     }
 

@@ -23,7 +23,10 @@ Window {
     }
 
     width: widthByState[pulseState] ?? 380
-    property real targetH: header.height + (body.active && body.item ? body.item.implicitHeight + 8 : 8)
+    // expanded: ExpandedView footer is at bottom, no extra margin needed
+    property real targetH: header.height + (body.active && body.item
+        ? body.item.implicitHeight + (pulseState === "expanded" ? 0 : 8)
+        : 8)
     property real animatedH: 52  // driven by heightAnim; Window.height binds to this
     height: animatedH
 
@@ -104,7 +107,10 @@ Window {
             anchors.top: header.bottom
             anchors.left: parent.left
             anchors.right: parent.right
-            height: active && item ? item.implicitHeight : 0  // decouple from window animation; parent.bottom caused footer at y<0 on first frame
+            // expanded: fill card so footer sticks to bottom during manual resize
+            height: pulseState === "expanded"
+                ? parent.height - header.height
+                : (active && item ? item.implicitHeight : 0)
             active: pulseState !== "idle" && pulseState !== "working"
             sourceComponent: {
                 if (pulseState === "permission") return permComp

@@ -90,6 +90,7 @@ static QVector<AgentInfo> buildMockSnapshot(const QString &scenario)
         a3.contextLimit = 200000;
         agents << a3;
         agents << mkAgent("api-gateway",  "Codex",       "",                      PulseState::Idle, false);
+        agents << mkAgent("frontend-ui", "Claude Code", "Running lint checks",   PulseState::Working);
     }
 
     return agents;
