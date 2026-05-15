@@ -52,12 +52,13 @@ Item {
 
                         Behavior on color { ColorAnimation { duration: 120 } }
 
-                        // Left accent rail — full height, flat edge
+                        // Left accent pill — vertically centered, clear of bottom context bar
                         Rectangle {
                             visible: rowItem.isActive
-                            anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
                             width: 3
-                            radius: 0
+                            height: 34
+                            radius: 2
+                            anchors { left: parent.left; verticalCenter: parent.verticalCenter }
                             color: rowItem.agentColor
                             opacity: 0.9
                         }
@@ -73,7 +74,7 @@ Item {
                         // Context usage slim bar
                         Item {
                             visible: model.contextUsed > 0 && model.contextLimit > 0
-                            anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                            anchors { left: parent.left; leftMargin: 3; right: parent.right; bottom: parent.bottom }
                             height: 2
 
                             readonly property real usageRatio:
