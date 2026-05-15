@@ -45,6 +45,8 @@ Item {
             opacity: 0
             transformOrigin: Item.Center
 
+            Behavior on border.color { ColorAnimation { duration: 300; easing.type: Easing.InOutQuad } }
+
             SequentialAnimation on scale {
                 loops: Animation.Infinite
                 NumberAnimation { from: 1.0; to: 2.6; duration: 2000; easing.type: Easing.OutCubic }
@@ -59,6 +61,7 @@ Item {
             anchors.centerIn: parent
             width: 8; height: 8; radius: 4
             color: stateColor
+            Behavior on color { ColorAnimation { duration: 300; easing.type: Easing.InOutQuad } }
         }
     }
 
@@ -73,13 +76,16 @@ Item {
 
         Text {
             width: parent.width
-            text: pulseState === "idle" ? (agentCount + " agents · all calm") : agentName
+            text: "Pulse"
             font.pixelSize: 13
             font.weight: Font.DemiBold
             color: Theme.text1
             elide: Text.ElideRight
         }
+
+        // Sub-text fades when it changes
         Text {
+            id: subText
             width: parent.width
             visible: text !== ""
             text: {
@@ -92,9 +98,21 @@ Item {
             }
             font.family: "JetBrains Mono"
             font.pixelSize: 10
-            // working: neutral white, others: text2
             color: pulseState === "working" ? Qt.rgba(1,1,1,0.72) : Theme.text2
             elide: Text.ElideRight
+
+            Behavior on color { ColorAnimation { duration: 250; easing.type: Easing.InOutQuad } }
+            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
+
+            onTextChanged: {
+                opacity = 0
+                fadeInTimer.restart()
+            }
+            Timer {
+                id: fadeInTimer
+                interval: 16
+                onTriggered: subText.opacity = 1
+            }
         }
     }
 
@@ -115,6 +133,18 @@ Item {
                 if (pulseState === "working")  return dotsComp
                 if (pulseState === "expanded") return null
                 return stateChip
+            }
+
+            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
+
+            onSourceComponentChanged: {
+                opacity = 0
+                metaFadeIn.restart()
+            }
+            Timer {
+                id: metaFadeIn
+                interval: 16
+                onTriggered: metaLoader.opacity = 1
             }
         }
     }
@@ -155,6 +185,10 @@ Item {
             color: Qt.rgba(chipColor.r, chipColor.g, chipColor.b, 0.12)
             border.color: Qt.rgba(chipColor.r, chipColor.g, chipColor.b, 0.38)
             border.width: 1
+
+            Behavior on color { ColorAnimation { duration: 250; easing.type: Easing.InOutQuad } }
+            Behavior on border.color { ColorAnimation { duration: 250; easing.type: Easing.InOutQuad } }
+
             Text {
                 id: chipLbl
                 anchors.centerIn: parent
@@ -165,6 +199,7 @@ Item {
                 font.pixelSize: 10
                 font.weight: Font.Medium
                 color: chipColor
+                Behavior on color { ColorAnimation { duration: 250; easing.type: Easing.InOutQuad } }
             }
         }
     }

@@ -76,3 +76,10 @@
 - 注册 SIGTERM/SIGINT 处理函数调用 QCoreApplication::quit()，确保信号杀进程时 aboutToQuit 仍能触发
 - HyprlandClient 和 TmuxResolver 的 QProcess waitForFinished 超时后调用 kill() + waitForFinished(100)，防止卡死的 hyprctl/tmux 子进程成为孤儿
 **Files**: src/main.cpp, src/HyprlandClient.cpp, src/TmuxResolver.cpp
+
+## 2026-05-15 — ✨ feat(ui): 为 HeaderBar 状态切换添加过渡动画
+
+- 指示点与光晕颜色变化使用 ColorAnimation 300ms
+- 右侧 chip Loader 切换时淡出→淡入 200ms
+- 副标题文字变化时淡出→淡入，颜色 250ms
+- Context-Id: 6c959316-b087-4e97-8f36-f216698a7da3
