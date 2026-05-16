@@ -176,9 +176,8 @@ Window {
                 })
 
                 item.opacity = 0
-                item.y = -6
+                item.y = 0
                 bodyOpacAnim.target = item
-                bodySlideAnim.target = item
                 bodyAnim.start()
             }
         }
@@ -186,7 +185,6 @@ Window {
         ParallelAnimation {
             id: bodyAnim
             NumberAnimation { id: bodyOpacAnim; property: "opacity"; to: 1; duration: 200; easing.type: Easing.OutCubic }
-            NumberAnimation { id: bodySlideAnim; property: "y"; to: 0; duration: 200; easing.type: Easing.OutCubic }
         }
     }
 

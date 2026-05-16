@@ -263,40 +263,20 @@ int main(int argc, char **argv)
     subMon->start();
     window->show();
 
-    // Resize via Hyprland IPC. The original 'dispatch pin ; resizewindowpixel ; dispatch pin'
-    // trick caused layer-shell windows to temporarily lose compositor state after a collapse,
-    // leaving a stale large blank window. Now we use resizewindowpixel directly (no pin).
-    if (HyprlandClient::available()) {
-        auto *selfAddr  = new QString();
-        auto *addrTimer = new QTimer(window);
-        addrTimer->setSingleShot(false);
-        addrTimer->setInterval(400);
-        QObject::connect(addrTimer, &QTimer::timeout, window, [selfAddr, window, addrTimer]() {
-            if (!selfAddr->isEmpty()) { addrTimer->stop(); return; }
-            const auto wins = HyprlandClient::clients();
-            *selfAddr = HyprlandClient::findWindowAddress(
-                static_cast<quint32>(QCoreApplication::applicationPid()), wins);
-            if (!selfAddr->isEmpty()) {
-                const qreal dpr = window->devicePixelRatio();
-                HyprlandClient::resizeWindow(*selfAddr,
-                    qRound(window->width()  * dpr),
-                    qRound(qMin(window->height(), 600) * dpr));
-            }
-        });
-        addrTimer->start();
-
+    // Resize via layer-shell set_size (respects anchor_top|anchor_right → grows downward).
+    // Previously used HyprlandClient::resizeWindow (resizewindowpixel IPC) which caused
+    // Hyprland to resize from the window center, making the panel appear to expand from
+    // the middle rather than from the header. The layer-shell protocol is the correct path.
+    if (layerShell.isValid()) {
         auto *resizeTimer = new QTimer(window);
         resizeTimer->setSingleShot(true);
         resizeTimer->setInterval(100);
         QObject::connect(window, &QWindow::widthChanged,  resizeTimer, [resizeTimer]{ resizeTimer->start(); });
         QObject::connect(window, &QWindow::heightChanged, resizeTimer, [resizeTimer]{ resizeTimer->start(); });
-        QObject::connect(resizeTimer, &QTimer::timeout, window, [selfAddr, window]() {
-            if (!selfAddr->isEmpty()) {
-                const qreal dpr = window->devicePixelRatio();
-                HyprlandClient::resizeWindow(*selfAddr,
-                    qRound(window->width()  * dpr),
-                    qRound(qMin(window->height(), 600) * dpr));
-            }
+        QObject::connect(resizeTimer, &QTimer::timeout, window, [&layerShell, window]() {
+            const qreal dpr = window->devicePixelRatio();
+            layerShell.setSize(qRound(window->width()  * dpr),
+                               qRound(qMin(window->height(), 600) * dpr));
         });
     }
 

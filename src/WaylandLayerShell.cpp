@@ -133,6 +133,21 @@ void WaylandLayerShell::requestResize(int width, int height)
     m_window->resize(width, height);
 }
 
+void WaylandLayerShell::setSize(int width, int height)
+{
+    if (!m_valid || !m_layerSurface || !m_window)
+        return;
+    // Call set_size directly from the main thread — safe because Qt's Wayland
+    // event dispatch also runs on the main thread (via QSocketNotifier).
+    // The request is buffered by libwayland and submitted on Qt's next
+    // wl_surface_commit(), which respects anchor_top|anchor_right so the
+    // window grows downward instead of from the center.
+    zwlr_layer_surface_v1_set_size(m_layerSurface,
+                                    static_cast<uint32_t>(width),
+                                    static_cast<uint32_t>(height));
+    m_window->resize(width, height);
+}
+
 void WaylandLayerShell::applyPendingResize()
 {
     if (!m_resizePending || !m_layerSurface)
