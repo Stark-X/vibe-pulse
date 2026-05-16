@@ -26,10 +26,6 @@ public:
     // Queue a resize — applied on the next Wayland configure round-trip
     void requestResize(int width, int height);
 
-    // Set size immediately via layer-shell protocol (call from main thread only).
-    // Respects the anchor_top|anchor_right anchor — window grows downward, not from center.
-    void setSize(int width, int height);
-
     static void registryGlobal(void *data, wl_registry *registry, uint32_t name, const char *interface, uint32_t version);
     static void registryGlobalRemove(void *data, wl_registry *registry, uint32_t name);
     static void layerSurfaceConfigure(void *data, zwlr_layer_surface_v1 *surface, uint32_t serial, uint32_t width, uint32_t height);
