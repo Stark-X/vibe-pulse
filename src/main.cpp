@@ -6,7 +6,6 @@
 #include <QFileInfo>
 #include <QFileSystemWatcher>
 #include <QGuiApplication>
-#include <QScreen>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLocalServer>
@@ -268,19 +267,22 @@ int main(int argc, char **argv)
     // trick caused layer-shell windows to temporarily lose compositor state after a collapse,
     // leaving a stale large blank window. Now we use resizewindowpixel directly (no pin).
     if (HyprlandClient::available()) {
-        // Compute the target top-right position (8px margin) after each resize.
-        // resizewindowpixel on floating windows scales from center, so we batch a
-        // movewindowpixel to re-anchor the window's top-left to the correct position.
+        // Query the window's current top-left position before each resize, then
+        // batch resize + movewindowpixel to restore it.  resizewindowpixel on
+        // floating windows scales from center, so without the move the header
+        // drifts upward as the panel expands.
         auto doResize = [window](const QString &addr) {
-            const qreal   dpr    = window->devicePixelRatio();
-            const QRect   geo    = (window->screen() ? window->screen()
-                                                     : QGuiApplication::primaryScreen())->geometry();
-            constexpr int margin = 8;
-            const int     w      = qRound(window->width()  * dpr);
-            const int     h      = qRound(qMin(window->height(), 600) * dpr);
-            const int     x      = geo.x() + geo.width() - window->width() - margin;
-            const int     y      = geo.y() + margin;
-            HyprlandClient::resizeWindow(addr, w, h, x, y);
+            const qreal dpr = window->devicePixelRatio();
+            const int   w   = qRound(window->width()  * dpr);
+            const int   h   = qRound(qMin(window->height(), 600) * dpr);
+            const auto  wins = HyprlandClient::clients();
+            for (const auto &win : wins) {
+                if (win.address == addr) {
+                    HyprlandClient::resizeWindow(addr, w, h, win.x, win.y);
+                    return;
+                }
+            }
+            HyprlandClient::resizeWindow(addr, w, h);  // fallback: no position fix
         };
 
         auto *selfAddr  = new QString();

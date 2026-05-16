@@ -48,6 +48,9 @@ QVector<HyprWindow> HyprlandClient::clients()
         w.pid     = o.value(QStringLiteral("pid")).toInteger();
         w.cls     = o.value(QStringLiteral("class")).toString();
         w.title   = o.value(QStringLiteral("title")).toString();
+        const QJsonArray at = o.value(QStringLiteral("at")).toArray();
+        w.x       = at.size() >= 2 ? at.at(0).toInt() : 0;
+        w.y       = at.size() >= 2 ? at.at(1).toInt() : 0;
         if (!w.address.isEmpty())
             result.append(w);
     }
@@ -74,13 +77,21 @@ QString HyprlandClient::focusWindow(const QString &address)
 void HyprlandClient::resizeWindow(const QString &address, int width, int height, int x, int y)
 {
     if (address.isEmpty() || !available()) return;
-    // Batch resize + move so the window anchors to (x, y) after resize.
+    // Batch resize + move so the window stays at (x, y) after resize.
     // resizewindowpixel on floating windows scales from center, so the move
-    // is required to re-anchor the top-left corner to the correct position.
+    // re-anchors the top-left corner back to the pre-resize position.
     const QString cmd =
         QStringLiteral("dispatch resizewindowpixel exact %1 %2,address:%3 ; "
                        "dispatch movewindowpixel exact %4 %5,address:%3")
         .arg(width).arg(height).arg(address).arg(x).arg(y);
+    QProcess::startDetached(QStringLiteral("hyprctl"), {QStringLiteral("--batch"), cmd});
+}
+
+void HyprlandClient::resizeWindow(const QString &address, int width, int height)
+{
+    if (address.isEmpty() || !available()) return;
+    const QString cmd = QStringLiteral("dispatch resizewindowpixel exact %1 %2,address:%3")
+        .arg(width).arg(height).arg(address);
     QProcess::startDetached(QStringLiteral("hyprctl"), {QStringLiteral("--batch"), cmd});
 }
 
