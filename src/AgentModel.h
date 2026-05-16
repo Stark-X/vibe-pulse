@@ -1,5 +1,6 @@
 #pragma once
 #include "AgentInfo.h"
+#include "WindowManager.h"
 
 #include <QAbstractListModel>
 #include <QElapsedTimer>
@@ -41,7 +42,7 @@ public:
     };
     Q_ENUM(Roles)
 
-    explicit AgentModel(QObject *parent = nullptr);
+    explicit AgentModel(WindowManager *wm, QObject *parent = nullptr);
 
     int      rowCount(const QModelIndex & = {}) const override;
     QVariant data(const QModelIndex &idx, int role = Qt::DisplayRole) const override;
@@ -70,7 +71,8 @@ signals:
 private:
     void recomputeGlobalState();
 
-    QVector<AgentInfo> m_agents;
+    WindowManager      *m_wm = nullptr;
+    QVector<AgentInfo>  m_agents;
     QString       m_globalState    = QStringLiteral("idle");
     int           m_activeAgentRow = -1;
     bool          m_idleCollapsed  = false;

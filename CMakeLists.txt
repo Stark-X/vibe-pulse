@@ -39,6 +39,9 @@ qt_add_executable(pulse
     src/AgentInfo.h
     src/AgentModel.h      src/AgentModel.cpp
     src/ProcScanner.h     src/ProcScanner.cpp
+    src/WindowManager.h       src/WindowManager.cpp
+    src/HyprlandWindowManager.h src/HyprlandWindowManager.cpp
+    src/NullWindowManager.h
     src/HyprlandClient.h  src/HyprlandClient.cpp
     src/TmuxResolver.h    src/TmuxResolver.cpp
     src/ClaudeMetaReader.h src/ClaudeMetaReader.cpp

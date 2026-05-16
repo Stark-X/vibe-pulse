@@ -1,10 +1,9 @@
 #include "AgentModel.h"
-#include "HyprlandClient.h"
 #include "ResponseWriter.h"
 
 #include <QProcess>
 
-AgentModel::AgentModel(QObject *parent) : QAbstractListModel(parent)
+AgentModel::AgentModel(WindowManager *wm, QObject *parent) : QAbstractListModel(parent), m_wm(wm)
 {
     m_idleCollapseTimer.setSingleShot(true);
     m_idleCollapseTimer.setInterval(m_idleDelayMs);
@@ -182,8 +181,8 @@ void AgentModel::focusAgent(int row)
     if (row < 0 || row >= m_agents.size())
         return;
     const AgentInfo &a = m_agents[row];
-    if (!a.windowAddress.isEmpty())
-        HyprlandClient::focusWindow(a.windowAddress);
+    if (!a.windowAddress.isEmpty() && m_wm)
+        m_wm->focusWindow(a.windowAddress);
     if (!a.tmuxTarget.isEmpty() && !a.tmuxClientTty.isEmpty()) {
         QProcess::startDetached(QStringLiteral("tmux"), {
             QStringLiteral("switch-client"),

@@ -19,12 +19,12 @@
 #include "AgentModel.h"
 #include "ClaudeMetaReader.h"
 #include "CodexMetaReader.h"
-#include "HyprlandClient.h"
 #include "ProcScanner.h"
 #include "Settings.h"
 #include "SubscriptionMonitor.h"
 #include "TmuxResolver.h"
 #include "WaylandLayerShell.h"
+#include "WindowManager.h"
 
 // Build a mock snapshot for UI preview — PULSE_MOCK=<scenario>
 // Scenarios: idle, working, permission, question, plan, expanded
@@ -100,11 +100,10 @@ static QVector<AgentInfo> buildMockSnapshot(const QString &scenario)
 // Enrich agents in-place with meta (session info, current step, window address).
 // Also returns JSONL/session paths that should be watched for live updates.
 static QStringList enrichAgents(QVector<AgentInfo> &agents,
+                                 WindowManager *wm,
                                  QFileSystemWatcher *watcher = nullptr)
 {
     QStringList newPaths;
-    const QVector<HyprWindow> wins =
-        HyprlandClient::available() ? HyprlandClient::clients() : QVector<HyprWindow>{};
 
     for (auto &a : agents) {
         if (a.toolType == QStringLiteral("Claude Code")) {
@@ -144,10 +143,10 @@ static QStringList enrichAgents(QVector<AgentInfo> &agents,
                 a.contextLimit = cm.contextLimit;
             }
         }
-        a.windowAddress = HyprlandClient::findWindowAddress(a.pid, wins);
+        a.windowAddress = wm->findWindowByPid(a.pid);
         if (a.windowAddress.isEmpty()) {
             if (auto pi = TmuxResolver::findPaneInfo(a.pid)) {
-                a.windowAddress  = HyprlandClient::findWindowAddress(pi->terminalPid, wins);
+                a.windowAddress  = wm->findWindowByPid(pi->terminalPid);
                 a.tmuxTarget     = pi->tmuxTarget;
                 a.tmuxClientTty  = pi->clientTty;
             }
@@ -179,7 +178,13 @@ int main(int argc, char **argv)
     app.setApplicationName(QStringLiteral("pulse"));
     app.setOrganizationName(QStringLiteral("Pulse"));
 
-    auto *model    = new AgentModel(&app);
+    // Detect the running compositor and select the appropriate WM backend.
+    // On Hyprland: uses hyprctl IPC for window discovery and resize.
+    // On other compositors: no-op (layer-shell set_size handles resize).
+    auto wm = WindowManager::create();
+    WindowManager *wmPtr = wm.get();
+
+    auto *model    = new AgentModel(wmPtr, &app);
     auto *settings = new Settings(&app);
     auto *scanner  = new ProcScanner(&app);
     auto *subMon   = new SubscriptionMonitor(&app);
@@ -205,7 +210,7 @@ int main(int argc, char **argv)
     auto doRefresh = [=]() {
         if (baseAgents->isEmpty() || demoMode || isMock) return;
         QVector<AgentInfo> agents = *baseAgents;
-        enrichAgents(agents, watcher);
+        enrichAgents(agents, wmPtr, watcher);
         model->setSnapshot(agents);
     };
 
@@ -226,7 +231,7 @@ int main(int argc, char **argv)
         if (isMock) return;  // mock mode: ignore real proc data
         *baseAgents = agents;
         if (!demoMode)
-            enrichAgents(agents, watcher);  // skip enrichment in demo mode
+            enrichAgents(agents, wmPtr, watcher);  // skip enrichment in demo mode
         model->setSnapshot(agents);
     });
 
@@ -263,37 +268,26 @@ int main(int argc, char **argv)
     subMon->start();
     window->show();
 
-    // Resize via Hyprland IPC. The original 'dispatch pin ; resizewindowpixel ; dispatch pin'
-    // trick caused layer-shell windows to temporarily lose compositor state after a collapse,
-    // leaving a stale large blank window. Now we use resizewindowpixel directly (no pin).
-    if (HyprlandClient::available()) {
-        // Query the window's current top-left position before each resize, then
-        // batch resize + movewindowpixel to restore it.  resizewindowpixel on
-        // floating windows scales from center, so without the move the header
-        // drifts upward as the panel expands.
-        auto doResize = [window](const QString &addr) {
+    // On compositors that need external resize IPC (currently Hyprland), use
+    // the window manager's resizeWindow to keep the overlay at the correct size
+    // and position. On others, layer-shell set_size is sufficient.
+    if (wmPtr->needsExternalResize()) {
+        auto doResize = [window, wmPtr](const QString &addr) {
             const qreal dpr = window->devicePixelRatio();
             const int   w   = qRound(window->width()  * dpr);
             const int   h   = qRound(qMin(window->height(), 600) * dpr);
-            const auto  wins = HyprlandClient::clients();
-            for (const auto &win : wins) {
-                if (win.address == addr) {
-                    HyprlandClient::resizeWindow(addr, w, h, win.x, win.y);
-                    return;
-                }
-            }
-            HyprlandClient::resizeWindow(addr, w, h);  // fallback: no position fix
+            wmPtr->resizeWindow(addr, w, h);
         };
 
         auto *selfAddr  = new QString();
         auto *addrTimer = new QTimer(window);
         addrTimer->setSingleShot(false);
         addrTimer->setInterval(400);
-        QObject::connect(addrTimer, &QTimer::timeout, window, [selfAddr, window, addrTimer, doResize]() {
+        QObject::connect(addrTimer, &QTimer::timeout, window,
+                         [selfAddr, addrTimer, doResize, wmPtr]() {
             if (!selfAddr->isEmpty()) { addrTimer->stop(); return; }
-            const auto wins = HyprlandClient::clients();
-            *selfAddr = HyprlandClient::findWindowAddress(
-                static_cast<quint32>(QCoreApplication::applicationPid()), wins);
+            *selfAddr = wmPtr->findWindowByPid(
+                static_cast<quint32>(QCoreApplication::applicationPid()));
             if (!selfAddr->isEmpty())
                 doResize(*selfAddr);
         });
