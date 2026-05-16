@@ -505,3 +505,4 @@ src-tauri/openspec/
 
 # Allow project-level Makefile (overrides Qt template's Makefile* rule)
 !/Makefile
+.claude/worktrees
