@@ -1,21 +1,27 @@
-BUILD := build_rel
+BUILD := build
 BIN   := $(BUILD)/pulse
 
-.PHONY: build run toggle clean \
+.PHONY: build run toggle clean configure \
         mock mock-idle mock-working mock-permission mock-question mock-plan mock-expanded \
         mock-subscription
 
-build:
+# Auto-configure if build directory is missing
+$(BUILD)/CMakeCache.txt:
+	cmake -B $(BUILD) -S . -DCMAKE_BUILD_TYPE=Release
+
+configure: $(BUILD)/CMakeCache.txt
+
+build: $(BUILD)/CMakeCache.txt
 	cmake --build $(BUILD) --target pulse
 
 run: build
 	$(BIN)
 
-toggle:
+toggle: $(BUILD)/CMakeCache.txt
 	cmake --build $(BUILD) --target pulse-toggle
 
 clean:
-	cmake --build $(BUILD) --target clean
+	rm -rf $(BUILD)
 
 # ── Mock preview targets ───────────────────────────────────────────────────────
 # 用法: make mock SCENE=<场景>  或直接 make mock-<场景>

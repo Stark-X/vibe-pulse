@@ -497,7 +497,7 @@ Temporary Items
 
 
 # pulse Qt build outputs
-build_rel/
+build/
 
 # Deprecated Tauri-era OpenSpec (Qt rewrite is complete)
 src-tauri/openspec/
