@@ -71,13 +71,16 @@ QString HyprlandClient::focusWindow(const QString &address)
     return {};
 }
 
-void HyprlandClient::resizeWindow(const QString &address, int width, int height)
+void HyprlandClient::resizeWindow(const QString &address, int width, int height, int x, int y)
 {
     if (address.isEmpty() || !available()) return;
-    // No 'dispatch pin' wrapper — it causes layer-shell windows to temporarily lose
-    // compositor state, which can leave a stale large blank window after collapse.
-    const QString cmd = QStringLiteral("dispatch resizewindowpixel exact %1 %2,address:%3")
-        .arg(width).arg(height).arg(address);
+    // Batch resize + move so the window anchors to (x, y) after resize.
+    // resizewindowpixel on floating windows scales from center, so the move
+    // is required to re-anchor the top-left corner to the correct position.
+    const QString cmd =
+        QStringLiteral("dispatch resizewindowpixel exact %1 %2,address:%3 ; "
+                       "dispatch movewindowpixel exact %4 %5,address:%3")
+        .arg(width).arg(height).arg(address).arg(x).arg(y);
     QProcess::startDetached(QStringLiteral("hyprctl"), {QStringLiteral("--batch"), cmd});
 }
 
