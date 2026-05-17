@@ -20,12 +20,34 @@ Window {
     // Detail sub-mode: "permission" | "question" | "plan"
     property string detailMode: ""
 
-    // Window sizing
-    width: geo ? geo.screenWidth : 0
-    height: animatedH
-
+    // Layout constants
     readonly property int compactH: 32
     readonly property int bandH: 32
+    readonly property int leftW: 64
+    readonly property int rightW: 60
+    readonly property int hMargin: 4
+
+    // Dynamic width: compact = left + gap + right, expanded = content width
+    readonly property real compactW: {
+        if (!geo) return leftW + rightW + hMargin * 2
+        if (hasNotch) {
+            // Span from left edge of left pill to right edge of right pill
+            // leftX = screenX + leftAreaW - leftW - hMargin
+            // rightX = screenX + screenWidth - rightAreaW + hMargin
+            // rightEdge = rightX + rightW
+            // totalW = rightEdge - leftX
+            var lx = geo.leftAreaWidth - leftW - hMargin
+            var rx = geo.screenWidth - geo.rightAreaWidth + hMargin + rightW
+            return rx - lx
+        }
+        // No notch: side by side with gap
+        return leftW + 12 + rightW
+    }
+    readonly property real expandedW: 380
+
+    width: fusionMode === "compact" ? compactW : expandedW
+    height: animatedH
+
     property real listContentH: 0
     readonly property real targetH: {
         if (fusionMode === "compact") return compactH
@@ -36,6 +58,7 @@ Window {
     property real animatedH: compactH
 
     Behavior on height { NumberAnimation { duration: 280; easing.type: Easing.OutQuint } }
+    Behavior on width { NumberAnimation { duration: 280; easing.type: Easing.OutQuint } }
     onTargetHChanged: animatedH = targetH
 
     // Auto-expand for attention states
@@ -53,23 +76,15 @@ Window {
         }
     }
 
-    // Click-through hit region update
-    onFusionModeChanged: updateHitRegions()
+    // Hit region update — whole window is content, no pass-through needed
+    onFusionModeChanged: { updateHitRegions(); positionWindow() }
     onHeightChanged: updateHitRegions()
-    onWidthChanged: updateHitRegions()
+    onWidthChanged: { updateHitRegions(); positionWindow() }
 
     function updateHitRegions() {
-        if (!overlayProxy || !geo) return
-        var regions = []
-        // Left zone (always active)
-        regions.push({x: leftZone.x, y: leftZone.y, width: leftZone.width, height: leftZone.height})
-        // Right zone (always active)
-        regions.push({x: rightZone.x, y: rightZone.y, width: rightZone.width, height: rightZone.height})
-        // Expanded area below band
-        if (fusionMode !== "compact") {
-            regions.push({x: 0, y: bandH, width: width, height: height - bandH})
-        }
-        overlayProxy.setHitTestRegions(regions)
+        if (!overlayProxy) return
+        // Whole window is interactive content
+        overlayProxy.setHitTestRegions([{x: 0, y: 0, width: width, height: height}])
     }
 
     // State color from global state
@@ -85,7 +100,7 @@ Window {
         return "#8b88a8"
     }
 
-    // Background band — dark strip across the top
+    // Background pill shape
     Rectangle {
         id: band
         anchors.top: parent.top
@@ -93,13 +108,13 @@ Window {
         anchors.right: parent.right
         height: bandH
         color: "#0a0a0c"
-        radius: 0
+        radius: height / 2
 
         // Click to toggle compact/list
         MouseArea {
             anchors.fill: parent
             onClicked: {
-                if (root.fusionMode === "detail") return  // auto-retract only
+                if (root.fusionMode === "detail") return
                 root.fusionMode = (root.fusionMode === "compact") ? "list" : "compact"
             }
         }
@@ -108,125 +123,122 @@ Window {
         Item {
             id: leftZone
             anchors.left: parent.left
-            anchors.leftMargin: geo ? (geo.hasNotch ? geo.leftAreaWidth - width - 4 : 8) : 8
+            anchors.leftMargin: hMargin
             anchors.verticalCenter: parent.verticalCenter
-            width: 64
+            width: leftW - hMargin * 2
             height: 28
 
-            Rectangle {
-                anchors.fill: parent
-                radius: height / 2
-                color: "#0a0a0c"
+            Row {
+                anchors.centerIn: parent
+                spacing: 6
 
-                Row {
-                    anchors.centerIn: parent
-                    spacing: 6
+                Rectangle {
+                    width: 7; height: 7; radius: 3.5
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: root.stateColor
+
+                    Behavior on color { ColorAnimation { duration: 300; easing.type: Easing.InOutQuad } }
 
                     Rectangle {
-                        width: 7; height: 7; radius: 3.5
-                        anchors.verticalCenter: parent.verticalCenter
-                        color: root.stateColor
+                        anchors.centerIn: parent
+                        width: parent.width + 4; height: parent.height + 4
+                        radius: width / 2
+                        color: "transparent"
+                        border.color: root.stateColor
+                        border.width: 1
+                        opacity: agentModel.globalState !== "idle" ? 0.4 : 0
+                        visible: opacity > 0
 
-                        Behavior on color { ColorAnimation { duration: 300; easing.type: Easing.InOutQuad } }
-
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: parent.width + 4; height: parent.height + 4
-                            radius: width / 2
-                            color: "transparent"
-                            border.color: root.stateColor
-                            border.width: 1
-                            opacity: agentModel.globalState !== "idle" ? 0.4 : 0
-                            visible: opacity > 0
-
-                            SequentialAnimation on scale {
-                                running: agentModel.globalState !== "idle"
-                                loops: Animation.Infinite
-                                NumberAnimation { from: 0.8; to: 1.6; duration: 1800; easing.type: Easing.OutCubic }
-                                NumberAnimation { from: 1.6; to: 0.8; duration: 0 }
-                            }
-
-                            Behavior on opacity { NumberAnimation { duration: 300 } }
+                        SequentialAnimation on scale {
+                            running: agentModel.globalState !== "idle"
+                            loops: Animation.Infinite
+                            NumberAnimation { from: 0.8; to: 1.6; duration: 1800; easing.type: Easing.OutCubic }
+                            NumberAnimation { from: 1.6; to: 0.8; duration: 0 }
                         }
-                    }
 
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: agentModel.count
-                        font.family: "JetBrains Mono"
-                        font.pixelSize: 12
-                        font.weight: Font.Medium
-                        color: "#e8e8f0"
+                        Behavior on opacity { NumberAnimation { duration: 300 } }
                     }
                 }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: agentModel.count
+                    font.family: "JetBrains Mono"
+                    font.pixelSize: 12
+                    font.weight: Font.Medium
+                    color: "#e8e8f0"
+                }
             }
+        }
+
+        // Separator dot (only in compact mode when notch is present)
+        Rectangle {
+            visible: root.fusionMode === "compact" && root.hasNotch
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            width: 3; height: 3; radius: 1.5
+            color: Qt.rgba(1, 1, 1, 0.15)
         }
 
         // Right zone: usage arc gauge
         Item {
             id: rightZone
             anchors.right: parent.right
-            anchors.rightMargin: geo ? (geo.hasNotch ? geo.rightAreaWidth - width + 4 : 12) : 12
+            anchors.rightMargin: hMargin
             anchors.verticalCenter: parent.verticalCenter
-            width: 60
+            width: rightW - hMargin * 2
             height: 28
 
-            Rectangle {
-                anchors.fill: parent
-                radius: height / 2
-                color: "#0a0a0c"
+            Row {
+                anchors.centerIn: parent
+                spacing: 5
                 visible: subscriptionMonitor.claudeAvailable
 
-                Row {
-                    anchors.centerIn: parent
-                    spacing: 5
+                Canvas {
+                    id: gauge
+                    width: 16; height: 16
+                    anchors.verticalCenter: parent.verticalCenter
 
-                    Canvas {
-                        id: gauge
-                        width: 16; height: 16
-                        anchors.verticalCenter: parent.verticalCenter
+                    onPaint: {
+                        var ctx = getContext("2d")
+                        ctx.reset()
 
-                        onPaint: {
-                            var ctx = getContext("2d")
-                            ctx.reset()
+                        var cx = width / 2
+                        var cy = height / 2
+                        var r = Math.min(cx, cy) - 1.5
+                        var pct = subscriptionMonitor.claudeUtilization / 100
 
-                            var cx = width / 2
-                            var cy = height / 2
-                            var r = Math.min(cx, cy) - 1.5
-                            var pct = subscriptionMonitor.claudeUtilization / 100
+                        ctx.beginPath()
+                        ctx.arc(cx, cy, r, 0, 2 * Math.PI)
+                        ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.10)
+                        ctx.lineWidth = 2
+                        ctx.stroke()
 
+                        if (pct > 0.001) {
+                            var startAngle = -Math.PI / 2
+                            var endAngle   = startAngle + pct * 2 * Math.PI
                             ctx.beginPath()
-                            ctx.arc(cx, cy, r, 0, 2 * Math.PI)
-                            ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.10)
+                            ctx.arc(cx, cy, r, startAngle, endAngle)
+                            ctx.strokeStyle = root.usageColor(subscriptionMonitor.claudeUtilization)
                             ctx.lineWidth = 2
+                            ctx.lineCap = "round"
                             ctx.stroke()
-
-                            if (pct > 0.001) {
-                                var startAngle = -Math.PI / 2
-                                var endAngle   = startAngle + pct * 2 * Math.PI
-                                ctx.beginPath()
-                                ctx.arc(cx, cy, r, startAngle, endAngle)
-                                ctx.strokeStyle = root.usageColor(subscriptionMonitor.claudeUtilization)
-                                ctx.lineWidth = 2
-                                ctx.lineCap = "round"
-                                ctx.stroke()
-                            }
-                        }
-
-                        Connections {
-                            target: subscriptionMonitor
-                            function onDataChanged() { gauge.requestPaint() }
                         }
                     }
 
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: Math.round(subscriptionMonitor.claudeUtilization) + "%"
-                        font.family: "JetBrains Mono"
-                        font.pixelSize: 10
-                        font.weight: Font.Medium
-                        color: root.usageColor(subscriptionMonitor.claudeUtilization)
+                    Connections {
+                        target: subscriptionMonitor
+                        function onDataChanged() { gauge.requestPaint() }
                     }
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: Math.round(subscriptionMonitor.claudeUtilization) + "%"
+                    font.family: "JetBrains Mono"
+                    font.pixelSize: 10
+                    font.weight: Font.Medium
+                    color: root.usageColor(subscriptionMonitor.claudeUtilization)
                 }
             }
         }
@@ -256,12 +268,19 @@ Window {
                 id: listContent
                 implicitHeight: Math.min(agentList.implicitHeight, 280) + 32
 
-                // Agent list
+                // Rounded bottom corners
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 16
+                    color: "#0a0a0c"
+                }
+
                 Column {
                     id: agentList
                     anchors.top: parent.top
                     anchors.left: parent.left
                     anchors.right: parent.right
+                    topPadding: 4
                     Repeater {
                         model: agentModel
                         delegate: Item {
@@ -330,7 +349,6 @@ Window {
                     }
                 }
 
-                // Footer
                 Item {
                     anchors.bottom: parent.bottom
                     anchors.left: parent.left; anchors.right: parent.right
@@ -374,27 +392,36 @@ Window {
     Component { id: questComp; QuestionView { agentRow: agentModel.activeAgentRow } }
     Component { id: planComp;  PlanView { agentRow: agentModel.activeAgentRow } }
 
-    // Geometry-driven positioning
+    // Position: centered on notch area in compact, centered on screen in expanded
     onGeoChanged: positionWindow()
+    onCompactWChanged: positionWindow()
 
     function positionWindow() {
         if (!overlayProxy) return
         if (!geo) {
-            // Fallback for mock mode or non-notched screens
             root.x = 0
             root.y = 0
             return
         }
-        root.x = geo.screenX || 0
-        root.y = geo.y || 0
-        root.width = geo.screenWidth || 0
-        overlayProxy.placeFusionWindow(geo.screenX || 0, geo.y || 0, geo.screenWidth || 0)
+        var w = root.width
+        var x, y
+        if (root.fusionMode === "compact") {
+            // Position so leftZone aligns with left auxiliary area
+            x = (geo.leftAreaWidth || 80) - leftW + hMargin
+            y = geo.y || 0
+        } else {
+            // Expanded: center on screen
+            x = (geo.screenWidth - w) / 2
+            y = geo.y || 0
+        }
+        root.x = x
+        root.y = y
+        overlayProxy.placeFusionWindow(x, y, w)
         updateHitRegions()
     }
 
     Component.onCompleted: {
         positionWindow()
-        // Delayed re-position after QML settles
         Qt.callLater(positionWindow)
     }
 }

@@ -403,25 +403,20 @@ int main(int argc, char **argv)
             repositionHuds();
         });
     } else if (notchGeo && useFusion) {
-        // Fusion mode: position the single NotchFusionWidget window
-        WindowOverlay *ovl = overlay.get();
-        auto repositionFusion = [=]() {
-            const auto &positions = notchGeo->positions();
-            if (positions.isEmpty()) return;
-            const auto &pos = positions[0];
-            ovl->placeFusionWindow(window, pos.screenX, pos.y, pos.screenWidth);
-        };
+        // Fusion mode: QML handles positioning via overlayProxy.placeFusionWindow().
+        // C++ only needs to trigger geometry refresh; QML's positionWindow() runs
+        // automatically when notchGeometry.screenPositions changes.
+        auto refreshGeo = [=]() { notchGeo->refresh(); };
 
-        QObject::connect(notchGeo, &NotchGeometry::geometryChanged, window, repositionFusion);
+        QObject::connect(notchGeo, &NotchGeometry::geometryChanged, window, refreshGeo);
 
         QObject::connect(static_cast<QGuiApplication *>(QGuiApplication::instance()),
                          &QGuiApplication::screenAdded, window,
                          [notchGeo](QScreen *) { notchGeo->refresh(); });
 
-        QTimer::singleShot(0,    window, repositionFusion);
-        QTimer::singleShot(1000, window, [notchGeo, repositionFusion]() {
+        QTimer::singleShot(0,    window, refreshGeo);
+        QTimer::singleShot(1000, window, [notchGeo, refreshGeo]() {
             notchGeo->refresh();
-            repositionFusion();
         });
     }
 #endif
