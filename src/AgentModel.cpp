@@ -86,7 +86,7 @@ QVariant AgentModel::data(const QModelIndex &idx, int role) const
     case SessionBusyRole:     return a.sessionBusy;
     case CurrentStepRole:     return a.currentStep;
     case WindowAddressRole:   return a.windowAddress;
-    case CanJumpRole:         return !a.windowAddress.isEmpty();
+    case CanJumpRole:         return !a.windowAddress.isEmpty() || !a.tmuxTarget.isEmpty();
     case PulseStateRole:      return static_cast<int>(a.pulseState);
     case QuestionPromptRole:  return a.questionPrompt;
     case QuestionOptionsRole: return a.questionOptions;
@@ -122,7 +122,7 @@ QVariantMap AgentModel::get(int row) const
         { QStringLiteral("sessionBusy"),     a.sessionBusy      },
         { QStringLiteral("currentStep"),     a.currentStep      },
         { QStringLiteral("windowAddress"),   a.windowAddress    },
-        { QStringLiteral("canJump"),         !a.windowAddress.isEmpty() },
+        { QStringLiteral("canJump"),         !a.windowAddress.isEmpty() || !a.tmuxTarget.isEmpty() },
         { QStringLiteral("pulseState"),      static_cast<int>(a.pulseState) },
         { QStringLiteral("questionPrompt"),  a.questionPrompt   },
         { QStringLiteral("questionOptions"), a.questionOptions  },

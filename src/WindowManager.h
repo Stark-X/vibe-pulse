@@ -16,6 +16,10 @@ public:
     // Focus the window identified by a compositor-specific ID.
     virtual void focusWindow(const QString &windowId) = 0;
 
+    // Find the GUI window address for the process that owns the given TTY (e.g. "/dev/ttys003").
+    // Used as fallback when findWindowByPid via ancestor chain yields nothing.
+    virtual QString findWindowByTTY(const QString &tty) const { Q_UNUSED(tty); return {}; }
+
     // Resize the pulse overlay window identified by windowId to (w, h) pixels.
     // Implementations that need position correction (e.g. Hyprland IPC resizes
     // from center) should query and restore position internally.

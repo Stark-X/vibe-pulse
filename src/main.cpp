@@ -17,6 +17,7 @@
 #include "AgentModel.h"
 #include "ClaudeMetaReader.h"
 #include "CodexMetaReader.h"
+#include "ProcessTree.h"
 #include "ProcScanner.h"
 #include "Settings.h"
 #include "SubscriptionMonitor.h"
@@ -144,9 +145,18 @@ static QStringList enrichAgents(QVector<AgentInfo> &agents,
         a.windowAddress = wm->findWindowByPid(a.pid);
         if (a.windowAddress.isEmpty()) {
             if (auto pi = TmuxResolver::findPaneInfo(a.pid)) {
-                a.windowAddress  = wm->findWindowByPid(pi->terminalPid);
-                a.tmuxTarget     = pi->tmuxTarget;
-                a.tmuxClientTty  = pi->clientTty;
+                // tmux client PID is a CLI process; walk up the ancestor chain to
+                // find the GUI terminal emulator (iTerm2, Terminal.app, etc.)
+                for (quint32 p : ProcessTree::ancestorChain(pi->terminalPid)) {
+                    a.windowAddress = wm->findWindowByPid(p);
+                    if (!a.windowAddress.isEmpty()) break;
+                }
+                a.tmuxTarget    = pi->tmuxTarget;
+                a.tmuxClientTty = pi->clientTty;
+                // Fallback: ancestor chain from tmux client PID may not reach the
+                // GUI terminal if the client was reparented. Try via TTY device instead.
+                if (a.windowAddress.isEmpty() && !a.tmuxClientTty.isEmpty())
+                    a.windowAddress = wm->findWindowByTTY(a.tmuxClientTty);
             }
         }
     }
