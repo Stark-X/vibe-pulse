@@ -102,3 +102,14 @@
 - 将 BUILD 从 build_rel 改为标准 build 目录，与 README 保持一致
 - 新增 $(BUILD)/CMakeCache.txt 文件依赖作为 configure 触发器——build 目录不存在时自动运行 cmake -B build -S .，无需手动初始化
 - clean 目标改为 rm -rf $(BUILD) 彻底清除构建目录，而非调用 cmake clean（后者要求目录已存在）
+
+## 2026-05-17 — fix(macos): 修复刘海 HUD 被 macOS 安全区域限制无法紧贴顶部的问题
+**Decisions:**
+- NSScreenSaverWindowLevel (1000) 绕过 macOS constrainFrameRect:toScreen: 安全区域限制
+- 通过 method_setImplementation swizzle constrainFrameRect 而非 isa 替换，避免破坏 Qt KVO 观察者
+- 引入 placeNotchHud() 虚方法直接调用 NSWindow setFrameTopLeftPoint: 绕过 Qt setPosition 的安全区限制
+- 屏幕匹配从 screenName 改为 geometry (X,Y) 坐标，修复多显示器下找不到正确 QScreen 的问题
+- createMissingHudWindows 加可重入静态 bool 保护，防止 AppKit 通知触发递归创建
+- 定位延迟 0ms+1000ms 两次触发，应对 MacBook 启动后 NSNotification 洪泛
+- QML 左 HUD 宽度 48→64px，右 HUD 32→60px，新增脉冲动画和百分比文字
+**Files:** qml/NotchLeftHUD.qml, qml/NotchRightHUD.qml, src/NotchGeometry.h, src/NotchGeometry.mm, src/WindowOverlay.h, src/WindowOverlay_macos.mm, src/main.cpp

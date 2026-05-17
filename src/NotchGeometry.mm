@@ -47,10 +47,19 @@ void NotchGeometry::compute()
     m_available = false;
     m_screenPositions.clear();
 
+    // Debug: dump to /tmp/notch_geo.log (append so multiple compute() calls visible)
+    FILE *dbg = fopen("/tmp/notch_geo.log", "a");
+    auto LOG = [&](const char *fmt, ...) {
+        if (!dbg) return;
+        va_list ap; va_start(ap, fmt); vfprintf(dbg, fmt, ap); va_end(ap);
+        fflush(dbg);
+    };
+
     if (@available(macOS 12.0, *)) {
         // Determine the global coordinate system baseline (top of primary screen in Qt coords)
         NSScreen *primaryScreen = [NSScreen mainScreen];
         CGFloat primaryTopInAppKit = primaryScreen.frame.origin.y + primaryScreen.frame.size.height;
+        LOG("primaryTopInAppKit=%.0f\n", primaryTopInAppKit);
 
         for (NSScreen *screen in [NSScreen screens]) {
             ScreenHudPos pos;
@@ -66,28 +75,36 @@ void NotchGeometry::compute()
             qreal screenX = static_cast<qreal>(frame.origin.x);
             qreal screenY = static_cast<qreal>(primaryTopInAppKit - frame.origin.y - frame.size.height);
 
+            pos.screenX = screenX;
+            pos.screenY = screenY;
+
+            LOG("screen=%s frame=(%.0f,%.0f,%.0fx%.0f) safeTop=%.0f leftAreaW=%.0f rightAreaW=%.0f\n",
+                pos.screenName.toUtf8().constData(),
+                frame.origin.x, frame.origin.y, frame.size.width, frame.size.height,
+                safeTop, leftAreaW, rightAreaW);
+            LOG("  Qt coords: screenX=%.0f screenY=%.0f\n", screenX, screenY);
+
             if (safeTop > 0 && leftAreaW > 0 && rightAreaW > 0) {
-                // Screen has a notch — position HUDs flanking it
+                // Screen has a notch — HUDs sit flush at the top, flanking the notch.
+                // Y=0 puts them in the notch band; placeNotchHud() bypasses macOS
+                // safe-area clamping so the window actually reaches Y=0.
                 pos.hasNotch = true;
-                const qreal hudHeight = 28;
-                const qreal leftMargin = 4;
+                const qreal leftHudW   = 64;
+                const qreal leftMargin  = 4;
                 const qreal rightMargin = 4;
 
-                pos.y = screenY + static_cast<qreal>((safeTop - hudHeight) / 2.0 + 2);
-                pos.leftX = screenX + static_cast<qreal>(leftAreaW - 48 - leftMargin);
+                pos.y      = screenY;  // top of screen (within notch band)
+                pos.leftX  = screenX + static_cast<qreal>(leftAreaW  - leftHudW  - leftMargin);
                 pos.rightX = screenX + static_cast<qreal>(frame.size.width - rightAreaW + rightMargin);
+                LOG("  NOTCH: leftX=%.0f rightX=%.0f y=%.0f\n", pos.leftX, pos.rightX, pos.y);
             } else {
-                // No notch — position HUDs in the menu bar area (top of screen)
-                // Menu bar height is typically ~24pt; safeAreaInsets.top gives it when no notch
-                CGFloat menuBarH = safeTop > 0 ? safeTop : 24.0;
-                const qreal hudHeight = 28;
-                const qreal rightMargin = 12;
-
-                pos.y = screenY + static_cast<qreal>((menuBarH - hudHeight) / 2.0 + 1);
-                // Left HUD at left edge of screen
-                pos.leftX = screenX + 8;
-                // Right HUD near right edge of screen
-                pos.rightX = screenX + static_cast<qreal>(frame.size.width) - 32 - rightMargin;
+                // No notch — position HUDs at the very top of the screen.
+                // The menu bar overlaps this area; at NSScreenSaverWindowLevel the
+                // HUDs appear just above or flush with the menu bar.
+                pos.y      = screenY;   // Y=0 relative to screen top (Qt global)
+                pos.leftX  = screenX + 8;
+                pos.rightX = screenX + static_cast<qreal>(frame.size.width) - 60 - 12;
+                LOG("  NO-NOTCH: leftX=%.0f rightX=%.0f y=%.0f\n", pos.leftX, pos.rightX, pos.y);
             }
 
             m_screenPositions.append(pos);
@@ -95,12 +112,15 @@ void NotchGeometry::compute()
         }
     }
 
+    if (dbg) fclose(dbg);
+
     if (m_available != prevAvailable || m_screenPositions.size() != prevPositions.size())
         emit geometryChanged();
     else {
         for (int i = 0; i < m_screenPositions.size(); ++i) {
             const auto &a = m_screenPositions[i], &b = prevPositions[i];
-            if (a.screenName != b.screenName || a.leftX != b.leftX ||
+            if (a.screenName != b.screenName || a.screenX != b.screenX ||
+                a.screenY != b.screenY || a.leftX != b.leftX ||
                 a.rightX != b.rightX || a.y != b.y || a.hasNotch != b.hasNotch) {
                 emit geometryChanged();
                 break;
