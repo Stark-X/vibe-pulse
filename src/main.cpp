@@ -333,8 +333,11 @@ int main(int argc, char **argv)
         QLocalServer::removeServer(serverName);
     });
 
-    // SIGTERM/SIGINT → graceful quit (ensures aboutToQuit fires)
+    // SIGTERM/SIGINT → graceful quit (ensures aboutToQuit fires).
+    // SIGTERM is POSIX-only; Windows only exposes SIGINT (Ctrl+C).
+#ifndef Q_OS_WIN
     signal(SIGTERM, [](int) { QCoreApplication::quit(); });
+#endif
     signal(SIGINT,  [](int) { QCoreApplication::quit(); });
 
     if (!isMock)

@@ -20,4 +20,12 @@ public:
 
     // All active main-thread PIDs on the system.
     static QVector<quint32> listAll();
+
+    // Returns the path of the first open file on this process whose path
+    // contains `needle` and ends with `suffix`.
+    // Linux: /proc/<pid>/fd symlinks. macOS: PROC_PIDLISTFDS.
+    // Windows: always returns empty (no portable per-process fd enumeration).
+    static QString openFileMatching(quint32 pid,
+                                    const QString &needle,
+                                    const QString &suffix);
 };

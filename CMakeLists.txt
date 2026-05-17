@@ -106,7 +106,8 @@ else()
 endif()
 
 # ── Targets ───────────────────────────────────────────────────────────────────
-qt_add_executable(pulse ${PULSE_COMMON_SOURCES} ${PULSE_PLATFORM_SOURCES})
+# MACOSX_BUNDLE produces a proper .app bundle on Apple; ignored on other platforms.
+qt_add_executable(pulse MACOSX_BUNDLE ${PULSE_COMMON_SOURCES} ${PULSE_PLATFORM_SOURCES})
 
 target_link_libraries(pulse PRIVATE
     Qt6::Core

@@ -74,4 +74,20 @@ quint32 ProcessTree::ppid(quint32 pid)
     return 0;
 }
 
+QString ProcessTree::openFileMatching(quint32 pid, const QString &needle,
+                                       const QString &suffix)
+{
+    const QString fdDir = QStringLiteral("/proc/%1/fd").arg(pid);
+    const QDir dir(fdDir);
+    if (!dir.exists())
+        return {};
+    for (const QString &entry : dir.entryList(QDir::System | QDir::Files)) {
+        const QString link =
+            QFileInfo(fdDir + QLatin1Char('/') + entry).symLinkTarget();
+        if (link.contains(needle) && link.endsWith(suffix))
+            return link;
+    }
+    return {};
+}
+
 // ancestorChain is implemented in ProcessTree.cpp (shared)

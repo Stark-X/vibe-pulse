@@ -69,4 +69,11 @@ QString ProcessTree::cwd(quint32) { return {}; }
 // Return empty for now; agent detection uses comm/exe matching only.
 QStringList ProcessTree::cmdline(quint32) { return {}; }
 
+// Windows has no portable per-process fd enumeration without undocumented APIs.
+// Callers should fall back to filesystem scanning when this returns empty.
+QString ProcessTree::openFileMatching(quint32, const QString &, const QString &)
+{
+    return {};
+}
+
 // ancestorChain is implemented in ProcessTree.cpp (shared)

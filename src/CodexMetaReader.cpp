@@ -1,6 +1,9 @@
 #include "CodexMetaReader.h"
+#include "ProcessTree.h"
 
+#include <QDateTime>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QStringList>
@@ -9,19 +12,34 @@
 
 // Find the session JSONL file that the Codex process has open.
 // Codex keeps a write fd on ~/.codex/sessions/<Y>/<M>/<D>/rollout-*.jsonl.
+//
+// Strategy:
+//   1. Ask ProcessTree for an open fd matching the path pattern (Linux/macOS).
+//   2. Fall back to scanning ~/.codex/sessions for the most-recently-modified
+//      rollout JSONL (Windows, or when fd enumeration is denied).
+//      Caveat: with multiple concurrent Codex processes the fallback picks the
+//      globally newest file, which may belong to a different process.
 static QString findSessionFile(quint32 pid)
 {
-    const QString fdDir = QStringLiteral("/proc/%1/fd").arg(pid);
-    const QDir dir(fdDir);
-    if (!dir.exists())
-        return {};
+    const QString viaFd = ProcessTree::openFileMatching(
+        pid, QStringLiteral("/.codex/sessions/"), QStringLiteral(".jsonl"));
+    if (!viaFd.isEmpty())
+        return viaFd;
 
-    for (const QString &entry : dir.entryList(QDir::System | QDir::Files)) {
-        const QString link = QFileInfo(fdDir + QLatin1Char('/') + entry).symLinkTarget();
-        if (link.contains(QStringLiteral("/.codex/sessions/")) && link.endsWith(QStringLiteral(".jsonl")))
-            return link;
+    const QString base = QDir::homePath() + QStringLiteral("/.codex/sessions");
+    QDirIterator it(base, {QStringLiteral("rollout-*.jsonl")},
+                    QDir::Files, QDirIterator::Subdirectories);
+    QString newestPath;
+    QDateTime newestMtime;
+    while (it.hasNext()) {
+        const QString p = it.next();
+        const QDateTime m = QFileInfo(p).lastModified();
+        if (newestPath.isEmpty() || m > newestMtime) {
+            newestPath  = p;
+            newestMtime = m;
+        }
     }
-    return {};
+    return newestPath;
 }
 
 // Summarise a function_call event into a short display string.

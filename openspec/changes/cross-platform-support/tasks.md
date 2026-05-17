@@ -61,3 +61,16 @@
 - [x] 10.4 Linux: `cmake --build build --target pulse-toggle` 编译成功
 - [ ] 10.5 macOS: cmake configure + build 验证（需 macOS 环境）
 - [ ] 10.6 Windows: cmake configure + build 验证（需 Windows 环境）
+
+## Phase 11: 第二轮跨平台代码修复
+
+- [x] 11.1 `src/main.cpp` 信号注册加 `#ifndef Q_OS_WIN` 守卫（SIGTERM 在 MSVC 不存在）
+- [x] 11.2 `src/ProcessTree.h` 新增 `openFileMatching()` 声明
+- [x] 11.3 `src/ProcessTree_linux.cpp` 实现 `openFileMatching()`（/proc/pid/fd 符号链接扫描）
+- [x] 11.4 `src/ProcessTree_macos.cpp` 实现 `openFileMatching()`（PROC_PIDLISTFDS + PROC_PIDFDVNODEPATHINFO）
+- [x] 11.5 `src/ProcessTree_win.cpp` 存根 `openFileMatching()`（返回空，上层回退文件系统扫描）
+- [x] 11.6 `src/CodexMetaReader.cpp` 改用 `ProcessTree::openFileMatching` 优先 + `~/.codex/sessions` mtime 回退
+- [x] 11.7 `src/ClaudeMetaReader.cpp::encodeCwd` 添加 Windows 路径 `\` → `/` → `-` 和冒号 → `-` 处理
+- [x] 11.8 `CMakeLists.txt` 加 `MACOSX_BUNDLE`（非 Apple 平台忽略）
+- [ ] 11.9 macOS 真机构建 + 运行验证（待外部）
+- [ ] 11.10 Windows 真机构建 + 运行验证（待外部）

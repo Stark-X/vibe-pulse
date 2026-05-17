@@ -48,6 +48,15 @@ ContextUsage parseContextUsage(const QByteArray &tail)
 static QString encodeCwd(const QString &cwd)
 {
     QString enc = cwd;
+#ifdef Q_OS_WIN
+    // Windows paths look like C:\Users\foo\bar.
+    // Normalise to forward-slash first, strip drive colon, then apply the
+    // generic slash→dash mapping below.
+    // TODO: verify this matches Claude Code's actual Windows session-path
+    // encoding if Claude Code on Windows uses a different convention.
+    enc.replace(QLatin1Char('\\'), QLatin1Char('/'));
+    enc.replace(QLatin1Char(':'),  QLatin1Char('-'));
+#endif
     enc.replace(QLatin1Char('/'), QLatin1Char('-'));
     return enc;
 }

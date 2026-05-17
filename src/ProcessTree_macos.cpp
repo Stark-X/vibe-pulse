@@ -3,6 +3,7 @@
 #include <QFileInfo>
 
 #include <libproc.h>
+#include <sys/proc_info.h>
 #include <sys/sysctl.h>
 
 QVector<quint32> ProcessTree::listAll()
@@ -81,6 +82,34 @@ quint32 ProcessTree::ppid(quint32 pid)
                      &info, sizeof(info)) <= 0)
         return 0;
     return static_cast<quint32>(info.pbi_ppid);
+}
+
+QString ProcessTree::openFileMatching(quint32 pid, const QString &needle,
+                                       const QString &suffix)
+{
+    const int ipid = static_cast<int>(pid);
+    const int bufSize = proc_pidinfo(ipid, PROC_PIDLISTFDS, 0, nullptr, 0);
+    if (bufSize <= 0)
+        return {};
+    QByteArray buf(bufSize + static_cast<int>(sizeof(proc_fdinfo)) * 4, '\0');
+    const int filled = proc_pidinfo(ipid, PROC_PIDLISTFDS, 0,
+                                    buf.data(), buf.size());
+    if (filled <= 0)
+        return {};
+    const int count = filled / static_cast<int>(sizeof(proc_fdinfo));
+    const auto *fds = reinterpret_cast<const proc_fdinfo *>(buf.constData());
+    for (int i = 0; i < count; ++i) {
+        if (fds[i].proc_fdtype != PROX_FDTYPE_VNODE)
+            continue;
+        struct vnode_fdinfowithpath vi{};
+        if (proc_pidfdinfo(ipid, fds[i].proc_fd, PROC_PIDFDVNODEPATHINFO,
+                           &vi, sizeof(vi)) <= 0)
+            continue;
+        const QString path = QString::fromLocal8Bit(vi.pvip.vip_path);
+        if (path.contains(needle) && path.endsWith(suffix))
+            return path;
+    }
+    return {};
 }
 
 // ancestorChain is implemented in ProcessTree.cpp (shared)
