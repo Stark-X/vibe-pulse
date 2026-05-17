@@ -9,3 +9,4 @@ AgentRow 1.0 AgentRow.qml
 Keycap 1.0 Keycap.qml
 NotchLeftHUD 1.0 NotchLeftHUD.qml
 NotchRightHUD 1.0 NotchRightHUD.qml
+NotchFusionWidget 1.0 NotchFusionWidget.qml

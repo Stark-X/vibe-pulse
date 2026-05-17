@@ -24,11 +24,17 @@ QVariantList NotchGeometry::screenPositions() const
     QVariantList list;
     for (const auto &pos : m_screenPositions) {
         list.append(QVariantMap{
-            {QStringLiteral("screenName"), pos.screenName},
-            {QStringLiteral("leftX"),      pos.leftX},
-            {QStringLiteral("rightX"),     pos.rightX},
-            {QStringLiteral("y"),          pos.y},
-            {QStringLiteral("hasNotch"),   pos.hasNotch},
+            {QStringLiteral("screenName"),    pos.screenName},
+            {QStringLiteral("leftX"),         pos.leftX},
+            {QStringLiteral("rightX"),        pos.rightX},
+            {QStringLiteral("y"),             pos.y},
+            {QStringLiteral("hasNotch"),      pos.hasNotch},
+            {QStringLiteral("screenWidth"),   pos.screenWidth},
+            {QStringLiteral("safeTop"),       pos.safeTop},
+            {QStringLiteral("leftAreaWidth"), pos.leftAreaWidth},
+            {QStringLiteral("rightAreaWidth"),pos.rightAreaWidth},
+            {QStringLiteral("notchLeftX"),    pos.notchLeftX},
+            {QStringLiteral("notchRightX"),   pos.notchRightX},
         });
     }
     return list;
@@ -56,8 +62,11 @@ void NotchGeometry::compute()
     };
 
     if (@available(macOS 12.0, *)) {
-        // Determine the global coordinate system baseline (top of primary screen in Qt coords)
-        NSScreen *primaryScreen = [NSScreen mainScreen];
+        // Use [NSScreen screens][0] for primary screen baseline (consistent with
+        // WindowOverlay_macos.mm placeNotchHud).  [NSScreen mainScreen] returns
+        // the screen with keyboard focus which can be an external display.
+        NSArray<NSScreen *> *allScreens = [NSScreen screens];
+        NSScreen *primaryScreen = allScreens.count > 0 ? allScreens[0] : [NSScreen mainScreen];
         CGFloat primaryTopInAppKit = primaryScreen.frame.origin.y + primaryScreen.frame.size.height;
         LOG("primaryTopInAppKit=%.0f\n", primaryTopInAppKit);
 
@@ -96,6 +105,14 @@ void NotchGeometry::compute()
                 pos.y      = screenY;  // top of screen (within notch band)
                 pos.leftX  = screenX + static_cast<qreal>(leftAreaW  - leftHudW  - leftMargin);
                 pos.rightX = screenX + static_cast<qreal>(frame.size.width - rightAreaW + rightMargin);
+
+                // Fusion widget geometry
+                pos.screenWidth    = static_cast<qreal>(frame.size.width);
+                pos.safeTop        = static_cast<qreal>(safeTop);
+                pos.leftAreaWidth  = static_cast<qreal>(leftAreaW);
+                pos.rightAreaWidth = static_cast<qreal>(rightAreaW);
+                pos.notchLeftX     = screenX + static_cast<qreal>(leftAreaW);
+                pos.notchRightX    = screenX + static_cast<qreal>(frame.size.width - rightAreaW);
                 LOG("  NOTCH: leftX=%.0f rightX=%.0f y=%.0f\n", pos.leftX, pos.rightX, pos.y);
             } else {
                 // No notch — position HUDs at the very top of the screen.
@@ -104,6 +121,14 @@ void NotchGeometry::compute()
                 pos.y      = screenY;   // Y=0 relative to screen top (Qt global)
                 pos.leftX  = screenX + 8;
                 pos.rightX = screenX + static_cast<qreal>(frame.size.width) - 60 - 12;
+
+                // Fusion widget geometry (no notch)
+                pos.screenWidth    = static_cast<qreal>(frame.size.width);
+                pos.safeTop        = static_cast<qreal>(safeTop);
+                pos.leftAreaWidth  = static_cast<qreal>(leftAreaW);
+                pos.rightAreaWidth = static_cast<qreal>(rightAreaW);
+                pos.notchLeftX     = screenX + static_cast<qreal>(leftAreaW);
+                pos.notchRightX    = screenX + static_cast<qreal>(frame.size.width - rightAreaW);
                 LOG("  NO-NOTCH: leftX=%.0f rightX=%.0f y=%.0f\n", pos.leftX, pos.rightX, pos.y);
             }
 
@@ -121,7 +146,10 @@ void NotchGeometry::compute()
             const auto &a = m_screenPositions[i], &b = prevPositions[i];
             if (a.screenName != b.screenName || a.screenX != b.screenX ||
                 a.screenY != b.screenY || a.leftX != b.leftX ||
-                a.rightX != b.rightX || a.y != b.y || a.hasNotch != b.hasNotch) {
+                a.rightX != b.rightX || a.y != b.y || a.hasNotch != b.hasNotch ||
+                a.screenWidth != b.screenWidth || a.safeTop != b.safeTop ||
+                a.leftAreaWidth != b.leftAreaWidth || a.rightAreaWidth != b.rightAreaWidth ||
+                a.notchLeftX != b.notchLeftX || a.notchRightX != b.notchRightX) {
                 emit geometryChanged();
                 break;
             }
