@@ -112,6 +112,7 @@ Window {
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
+            dragWindow: root
             pulseState: root.pulseState
             agentName: agentModel.activeAgentRow >= 0 ? (agentModel.get(agentModel.activeAgentRow).name ?? "") : ""
             agentSub: agentModel.activeAgentRow >= 0 ? (agentModel.get(agentModel.activeAgentRow).currentStep ?? "") : ""

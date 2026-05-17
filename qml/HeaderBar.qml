@@ -16,6 +16,7 @@ Item {
     property bool   codexAvailable:    false
 
     signal clicked()
+    property var dragWindow: null
 
     function usageColor(pct) {
         if (pct > 85) return Theme.coral
@@ -32,9 +33,43 @@ Item {
     }
 
     MouseArea {
+        id: dragArea
         anchors.fill: parent
-        onClicked: root.clicked()
-        cursorShape: Qt.PointingHandCursor
+
+        property real startGX: 0
+        property real startGY: 0
+        property real startWX: 0
+        property real startWY: 0
+        property bool wasDragged: false
+
+        onPressed: function(mouse) {
+            if (root.dragWindow) {
+                var gp = dragArea.mapToGlobal(mouse.x, mouse.y)
+                startGX = gp.x;  startGY = gp.y
+                startWX = root.dragWindow.x;  startWY = root.dragWindow.y
+            }
+            wasDragged = false
+        }
+
+        onPositionChanged: function(mouse) {
+            if (!root.dragWindow) return
+            var gp = dragArea.mapToGlobal(mouse.x, mouse.y)
+            var dx = gp.x - startGX
+            var dy = gp.y - startGY
+            if (!wasDragged && (Math.abs(dx) > 4 || Math.abs(dy) > 4))
+                wasDragged = true
+            if (wasDragged) {
+                root.dragWindow.x = startWX + dx
+                root.dragWindow.y = startWY + dy
+            }
+        }
+
+        onReleased: function(mouse) {
+            if (!wasDragged) root.clicked()
+            wasDragged = false
+        }
+
+        cursorShape: wasDragged ? Qt.ClosedHandCursor : Qt.PointingHandCursor
     }
 
     // Heart dot + ring container (20×20 gives ring room to expand)
