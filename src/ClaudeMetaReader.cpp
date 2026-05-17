@@ -47,17 +47,13 @@ ContextUsage parseContextUsage(const QByteArray &tail)
 
 static QString encodeCwd(const QString &cwd)
 {
-    QString enc = cwd;
-#ifdef Q_OS_WIN
-    // Windows paths look like C:\Users\foo\bar.
-    // Normalise to forward-slash first, strip drive colon, then apply the
-    // generic slash→dash mapping below.
-    // TODO: verify this matches Claude Code's actual Windows session-path
-    // encoding if Claude Code on Windows uses a different convention.
-    enc.replace(QLatin1Char('\\'), QLatin1Char('/'));
-    enc.replace(QLatin1Char(':'),  QLatin1Char('-'));
-#endif
-    enc.replace(QLatin1Char('/'), QLatin1Char('-'));
+    // Claude Code encodes cwd with: cwd.replace(/[^a-zA-Z0-9]/g, "-")
+    // Every non-alphanumeric character (/, \, :, space, _, ., etc.) → "-".
+    // Source: github.com/anthropics/claude-code/issues/24579 (encoding function Zz)
+    QString enc;
+    enc.reserve(cwd.size());
+    for (const QChar ch : cwd)
+        enc.append(ch.isLetterOrNumber() ? ch : QLatin1Char('-'));
     return enc;
 }
 
