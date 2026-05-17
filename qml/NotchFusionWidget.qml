@@ -378,11 +378,17 @@ Window {
     onGeoChanged: positionWindow()
 
     function positionWindow() {
-        if (!geo || !overlayProxy) return
-        root.x = geo.screenX
-        root.y = geo.y
-        root.width = geo.screenWidth
-        overlayProxy.placeFusionWindow(geo.screenX, geo.y, geo.screenWidth)
+        if (!overlayProxy) return
+        if (!geo) {
+            // Fallback for mock mode or non-notched screens
+            root.x = 0
+            root.y = 0
+            return
+        }
+        root.x = geo.screenX || 0
+        root.y = geo.y || 0
+        root.width = geo.screenWidth || 0
+        overlayProxy.placeFusionWindow(geo.screenX || 0, geo.y || 0, geo.screenWidth || 0)
         updateHitRegions()
     }
 

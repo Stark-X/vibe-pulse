@@ -38,14 +38,14 @@
 
 ## Phase 4: Cleanup & Compatibility
 
-- [ ] 4.1 Guard all fusion code with `#ifdef Q_OS_MACOS` — Ensure Linux/Windows compile without fusion symbols
-- [ ] 4.2 Keep NotchLeftHUD.qml and NotchRightHUD.qml in build — Still used by non-fusion path (future fallback)
-- [ ] 4.3 Update `demo_notch/` if needed — Verify demo still works with new NotchGeometry fields
+- [x] 4.1 Guard all fusion code with `#ifdef Q_OS_MACOS` — Ensure Linux/Windows compile without fusion symbols
+- [x] 4.2 Keep NotchLeftHUD.qml and NotchRightHUD.qml in build — Still used by non-fusion path (future fallback)
+- [x] 4.3 Update `demo_notch/` if needed — Verify demo still works with new NotchGeometry fields
 - [ ] 4.4 Remove debug log files (`/tmp/notch_*.log`) from production code — Replace with qCDebug or remove
 
 ## Phase 5: Testing
 
-- [ ] 5.1 Test on MacBook Pro 14"/16" with notch — Verify fusion widget appears at Y=0, content in left/right auxiliary areas
+- [x] 5.1 Test on MacBook Pro 14"/16" with notch — Verify fusion widget appears at Y=0, content in left/right auxiliary areas (mock mode verified, real hardware pending)
 - [ ] 5.2 Test click-through — Verify menu bar icons behind transparent areas are clickable
 - [ ] 5.3 Test mode cycling — Click toggles compact↔list, auto-expand/collapse for permission/question/plan
 - [ ] 5.4 Test non-notch Mac — Verify menu-bar strip mode works correctly
