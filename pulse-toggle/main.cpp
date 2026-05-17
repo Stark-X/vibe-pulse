@@ -1,4 +1,3 @@
-#include <unistd.h>
 #include <QCoreApplication>
 #include <QLocalSocket>
 #include <QJsonDocument>
@@ -8,19 +7,18 @@ int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
 
-    const QString socketPath =
-        QStringLiteral("/tmp/pulse-%1.sock").arg(getuid());
+    const QString cmd = (argc > 1) ? QString::fromLocal8Bit(argv[1])
+                                   : QStringLiteral("toggle");
 
     QLocalSocket socket;
-    socket.connectToServer(socketPath);
+    socket.connectToServer(QStringLiteral("pulse-ipc"));
     if (!socket.waitForConnected(1000)) {
-        qWarning("pulse not running or socket not found: %s",
-                 qPrintable(socketPath));
+        qWarning("pulse not running");
         return 1;
     }
 
     QJsonObject msg;
-    msg["cmd"] = "toggle";
+    msg[QStringLiteral("cmd")] = cmd;
     socket.write(QJsonDocument(msg).toJson(QJsonDocument::Compact) + '\n');
     socket.waitForBytesWritten(500);
     return 0;

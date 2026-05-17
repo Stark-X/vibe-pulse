@@ -1,5 +1,19 @@
-BUILD := build
-BIN   := $(BUILD)/pulse
+# ── Platform detection ─────────────────────────────────────────────────────────
+UNAME := $(shell uname -s 2>/dev/null || echo Windows)
+
+ifeq ($(UNAME),Darwin)
+    BUILD   := build_mac
+    BIN     := $(BUILD)/pulse
+    TOGGLE  := $(BUILD)/pulse-toggle
+else ifeq ($(UNAME),Linux)
+    BUILD   := build
+    BIN     := $(BUILD)/pulse
+    TOGGLE  := $(BUILD)/pulse-toggle
+else
+    BUILD   := build_win
+    BIN     := $(BUILD)/Release/pulse.exe
+    TOGGLE  := $(BUILD)/Release/pulse-toggle.exe
+endif
 
 .PHONY: build run toggle clean configure \
         mock mock-idle mock-working mock-permission mock-question mock-plan mock-expanded \
@@ -19,6 +33,7 @@ run: build
 
 toggle: $(BUILD)/CMakeCache.txt
 	cmake --build $(BUILD) --target pulse-toggle
+	$(TOGGLE) toggle
 
 clean:
 	rm -rf $(BUILD)

@@ -1,29 +1,10 @@
 #include "TmuxResolver.h"
+#include "ProcessTree.h"
 
 #include <climits>
 
-#include <QFile>
 #include <QProcess>
 #include <QStringList>
-
-static QString commOf(quint32 pid)
-{
-    QFile f(QStringLiteral("/proc/%1/comm").arg(pid));
-    if (!f.open(QIODevice::ReadOnly))
-        return {};
-    return QString::fromLocal8Bit(f.readAll()).trimmed();
-}
-
-static quint32 ppidOf(quint32 pid)
-{
-    QFile f(QStringLiteral("/proc/%1/status").arg(pid));
-    if (!f.open(QIODevice::ReadOnly))
-        return 0;
-    for (const QByteArray &line : f.readAll().split('\n'))
-        if (line.startsWith("PPid:"))
-            return line.mid(5).trimmed().toUInt();
-    return 0;
-}
 
 std::optional<TmuxPaneInfo> TmuxResolver::findPaneInfo(quint32 agentPid)
 {
@@ -31,16 +12,10 @@ std::optional<TmuxPaneInfo> TmuxResolver::findPaneInfo(quint32 agentPid)
         return std::nullopt;
 
     // Build PPID chain; detect tmux ancestor
-    QVector<quint32> chain;
-    chain.reserve(32);
-    chain.append(agentPid);
+    const QVector<quint32> chain = ProcessTree::ancestorChain(agentPid);
     bool inTmux = false;
-    for (int i = 0; i < 32; ++i) {
-        quint32 cur = ppidOf(chain.last());
-        if (cur == 0 || cur == 1)
-            break;
-        chain.append(cur);
-        if (commOf(cur).startsWith(QStringLiteral("tmux"))) {
+    for (quint32 p : chain) {
+        if (ProcessTree::comm(p).startsWith(QStringLiteral("tmux"))) {
             inTmux = true;
             break;
         }
@@ -59,7 +34,6 @@ std::optional<TmuxPaneInfo> TmuxResolver::findPaneInfo(quint32 agentPid)
         return std::nullopt;
 
     int     bestHop       = INT_MAX;
-    quint32 bestPanePid   = 0;
     QString bestSessionId;
     QString bestSessionName;
     int     bestWindowIdx = -1;
@@ -75,12 +49,11 @@ std::optional<TmuxPaneInfo> TmuxResolver::findPaneInfo(quint32 agentPid)
 
         const int hop = chain.indexOf(panePid);
         if (hop >= 0 && hop < bestHop) {
-            bestHop       = hop;
-            bestPanePid   = panePid;
+            bestHop         = hop;
             bestSessionId   = parts[1];
             bestSessionName = parts[2];
-            bestWindowIdx = parts[3].toInt();
-            bestPaneIdx   = parts[4].toInt();
+            bestWindowIdx   = parts[3].toInt();
+            bestPaneIdx     = parts[4].toInt();
         }
     }
 

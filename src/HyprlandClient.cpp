@@ -1,23 +1,10 @@
 #include "HyprlandClient.h"
+#include "ProcessTree.h"
 
-#include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
-
-static quint32 ppidOf(quint32 pid, int depth = 0)
-{
-    if (depth > 32)
-        return 0;
-    QFile f(QStringLiteral("/proc/%1/status").arg(pid));
-    if (!f.open(QIODevice::ReadOnly))
-        return 0;
-    for (const QByteArray &line : f.readAll().split('\n'))
-        if (line.startsWith("PPid:"))
-            return line.mid(5).trimmed().toUInt();
-    return 0;
-}
 
 bool HyprlandClient::available()
 {
@@ -106,7 +93,7 @@ QString HyprlandClient::findWindowAddress(quint32 agentPid,
     // walk PPid chain (up to 32 hops)
     quint32 cur = agentPid;
     for (int i = 0; i < 32; ++i) {
-        cur = ppidOf(cur);
+        cur = ProcessTree::ppid(cur);
         if (cur == 0 || cur == 1)
             break;
         for (const auto &w : wins)

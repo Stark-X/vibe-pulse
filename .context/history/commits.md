@@ -86,6 +86,17 @@
 - 使用 qEnvironmentVariableIsSet 而非 isEmpty 判断 mock 模式，正确处理空值 env var
 - usageRow 通过 Row child visible 控制折叠，空时 width=0，自动让出 Column 空间
 
+## 2026-05-17 — refactor(arch): 跨平台支持 macOS + Windows
+**Decisions:**
+- ProcessTree 共享接口抽象 /proc、libproc、Win32 三套进程信息 API，ProcScanner/TmuxResolver/HyprlandClient 统一使用
+- ProcScanner.cpp 改用 ProcessTree::listAll()/comm()/exe()/cwd()/cmdline()，dedup() 改用 ProcessTree::ppid()，无平台特定代码
+- TmuxResolver.cpp 改用 ProcessTree::ancestorChain()，同一实现在 Linux/macOS 复用；Windows 单独 TmuxResolver_win.cpp 通过 wsl.exe 代理 tmux
+- WindowOverlay 新抽象层：Linux 包裹 WaylandLayerShell，macOS 设 NSWindow level+collectionBehavior，Windows 设 HWND_TOPMOST+WS_EX_TOOLWINDOW
+- MacOSWindowManager 用 NSRunningApplication activateWithOptions 实现 focus-on-click，无需 Accessibility 权限
+- IPC socket 从 getuid()+/tmp/pulse-*.sock 改为 QLocalSocket("pulse-ipc")，跨平台自动映射到 Unix socket 或 Windows named pipe
+- CMakeLists.txt 三段条件块隔离 Wayland/libproc/Win32 依赖，macOS 启用 OBJCXX 编译 .mm 文件
+- Makefile 新增平台检测（Darwin/Linux/Windows），BUILD/BIN 变量化
+
 ## 2026-05-16 — chore(build): 构建路径改为标准 build/，新环境 make run 自动 configure
 **Decisions:**
 - 将 BUILD 从 build_rel 改为标准 build 目录，与 README 保持一致

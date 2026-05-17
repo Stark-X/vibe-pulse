@@ -1,5 +1,3 @@
-#include <unistd.h>
-
 #include <signal.h>
 
 #include <QDir>
@@ -23,8 +21,8 @@
 #include "Settings.h"
 #include "SubscriptionMonitor.h"
 #include "TmuxResolver.h"
-#include "WaylandLayerShell.h"
 #include "WindowManager.h"
+#include "WindowOverlay.h"
 
 // Build a mock snapshot for UI preview — PULSE_MOCK=<scenario>
 // Scenarios: idle, working, permission, question, plan, expanded
@@ -260,9 +258,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    WaylandLayerShell layerShell(window);
-    if (!layerShell.isValid())
-        qWarning("pulse: layer-shell unavailable, running as normal window");
+    auto overlay = WindowOverlay::create();
+    overlay->setup(window);
 
     component.completeCreate();
     subMon->start();
@@ -305,11 +302,11 @@ int main(int argc, char **argv)
     }
 
     // ── IPC socket ────────────────────────────────────────────────────────────
-    const QString socketPath =
-        QStringLiteral("/tmp/pulse-%1.sock").arg(static_cast<uint>(getuid()));
-    QLocalServer::removeServer(socketPath);
+    // QLocalServer maps to Unix socket on Unix, named pipe on Windows.
+    const QString serverName = QStringLiteral("pulse-ipc");
+    QLocalServer::removeServer(serverName);
     auto *server = new QLocalServer(&app);
-    server->listen(socketPath);
+    server->listen(serverName);
     QObject::connect(server, &QLocalServer::newConnection, window,
                      [server, window]() {
         QLocalSocket *conn = server->nextPendingConnection();
@@ -330,10 +327,10 @@ int main(int argc, char **argv)
     });
 
     // ── graceful shutdown ──────────────────────────────────────────────────────
-    QObject::connect(&app, &QGuiApplication::aboutToQuit, &app, [scanner, server, &socketPath]() {
+    QObject::connect(&app, &QGuiApplication::aboutToQuit, &app, [scanner, server, serverName]() {
         scanner->stop();
         server->close();
-        QLocalServer::removeServer(socketPath);
+        QLocalServer::removeServer(serverName);
     });
 
     // SIGTERM/SIGINT → graceful quit (ensures aboutToQuit fires)
