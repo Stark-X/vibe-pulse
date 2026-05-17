@@ -23,11 +23,24 @@ QVector<quint32> ProcessTree::listAll()
 
 QString ProcessTree::comm(quint32 pid)
 {
-    struct proc_bsdinfo info{};
-    if (proc_pidinfo(static_cast<int>(pid), PROC_PIDTBSDINFO, 0,
-                     &info, sizeof(info)) <= 0)
+    // Use KERN_PROCARGS2 to get argv[0] basename — matches what `ps -o comm=` shows.
+    // pbi_comm from PROC_PIDTBSDINFO returns the real binary name (e.g. "2.1.143"
+    // for claude's versioned binary), not the symlink name used to invoke it.
+    int mib[3] = { CTL_KERN, KERN_PROCARGS2, static_cast<int>(pid) };
+    size_t size = 0;
+    if (sysctl(mib, 3, nullptr, &size, nullptr, 0) < 0 || size < 4)
         return {};
-    return QString::fromLocal8Bit(info.pbi_comm);
+    QByteArray buf(static_cast<int>(size), '\0');
+    if (sysctl(mib, 3, buf.data(), &size, nullptr, 0) < 0)
+        return {};
+    int pos = 4;
+    while (pos < static_cast<int>(size) && buf[pos] != '\0') ++pos; // skip exe path
+    while (pos < static_cast<int>(size) && buf[pos] == '\0') ++pos; // skip nul padding
+    if (pos >= static_cast<int>(size))
+        return {};
+    const char *start = buf.constData() + pos;
+    const int len = static_cast<int>(strnlen(start, size - pos));
+    return QFileInfo(QString::fromLocal8Bit(start, len)).fileName();
 }
 
 QString ProcessTree::exe(quint32 pid)
