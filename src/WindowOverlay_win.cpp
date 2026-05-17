@@ -10,7 +10,7 @@
 
 class WindowsWindowOverlay final : public WindowOverlay {
 public:
-    void setup(QWindow *win) override {
+    void setup(QWindow *win, const OverlayOptions &) override {
         HWND hwnd = reinterpret_cast<HWND>(win->winId());
 
         // Always-on-top, no taskbar button

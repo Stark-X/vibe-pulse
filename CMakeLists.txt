@@ -82,13 +82,17 @@ elseif(APPLE)
     list(APPEND PULSE_PLATFORM_SOURCES
         src/ProcessTree_macos.cpp
         src/TmuxResolver.cpp
+        src/NotchGeometry.h
+        src/NotchGeometry.mm
         src/WindowOverlay_macos.mm
         src/MacOSWindowManager.h
         src/MacOSWindowManager.mm
     )
+    find_library(COREGRAPHICS_FW CoreGraphics REQUIRED)
     list(APPEND PULSE_PLATFORM_LIBS
         ${APPKIT_FW}
         ${FOUNDATION_FW}
+        ${COREGRAPHICS_FW}
     )
 
 # ── Windows ────────────────────────────────────────────────────────────────────
@@ -139,6 +143,8 @@ qt_add_resources(pulse pulse_qml
         qml/PermissionView.qml
         qml/ExpandedView.qml
         qml/Keycap.qml
+        qml/NotchLeftHUD.qml
+        qml/NotchRightHUD.qml
         assets/claude-code.png
         assets/codex.png
 )
