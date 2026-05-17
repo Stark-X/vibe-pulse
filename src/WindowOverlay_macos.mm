@@ -9,8 +9,10 @@
 class MacOSWindowOverlay final : public WindowOverlay {
 public:
     void setup(QWindow *win) override {
-        NSWindow *nswin = reinterpret_cast<NSWindow *>(
-            reinterpret_cast<void *>(win->winId()));
+        win->create();  // ensure native NSWindow exists before show()
+        NSView *nsview = reinterpret_cast<NSView *>(win->winId());
+        NSWindow *nswin = [nsview window];
+        if (!nswin) return;
 
         [nswin setLevel: NSStatusWindowLevel + 1];
         [nswin setCollectionBehavior:

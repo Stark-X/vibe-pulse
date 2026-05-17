@@ -1,10 +1,18 @@
 # Pulse
 
-AI agent monitor — Qt6 + QML floating overlay for Hyprland/Wayland.
+AI agent monitor — Qt6 + QML floating overlay for monitoring Claude Code, Codex, and OpenCode.
 
-Monitors Claude Code, Codex, OpenCode processes; shows session name, current step, and click-to-focus.
+Shows session name, current step, and click-to-focus. Supports Ubuntu/Hyprland (Wayland) and macOS.
 
 ## Dependencies
+
+### macOS
+
+```bash
+brew install qt
+```
+
+### Ubuntu / Debian
 
 ```bash
 sudo apt install \
@@ -17,11 +25,31 @@ sudo apt install \
 ## Build
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
+make build
 ```
 
-Binaries: `build/pulse`, `build/pulse-toggle`
+The `Makefile` auto-detects the platform and runs CMake configure on first build. No manual `cmake -B` step needed.
+
+Binaries:
+- **macOS**: `build_mac/pulse.app/Contents/MacOS/pulse`
+- **Linux**: `build/pulse`
+
+## Running
+
+```bash
+make run
+```
+
+Or run the mock preview scenes for UI development:
+
+```bash
+make mock-idle
+make mock-working
+make mock-permission
+make mock-question
+make mock-plan
+make mock-expanded
+```
 
 ## Hyprland setup
 
@@ -31,14 +59,6 @@ Add to `~/.config/hypr/hyprland.conf`:
 # Toggle Pulse overlay with Super+P
 bind = SUPER, P, exec, /path/to/pulse-toggle
 ```
-
-## Running
-
-```bash
-./build/pulse &
-```
-
-The overlay appears top-right, transparent, always-on-top. No taskbar entry.
 
 ## Themes
 

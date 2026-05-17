@@ -3,16 +3,19 @@ UNAME := $(shell uname -s 2>/dev/null || echo Windows)
 
 ifeq ($(UNAME),Darwin)
     BUILD   := build_mac
-    BIN     := $(BUILD)/pulse
-    TOGGLE  := $(BUILD)/pulse-toggle
+    BIN     := $(BUILD)/pulse.app/Contents/MacOS/pulse
+    TOGGLE  := $(BUILD)/pulse-toggle.app/Contents/MacOS/pulse-toggle
+    CMAKE_EXTRA := -DCMAKE_PREFIX_PATH=$(shell brew --prefix qt 2>/dev/null || echo /opt/homebrew/opt/qt)
 else ifeq ($(UNAME),Linux)
     BUILD   := build
     BIN     := $(BUILD)/pulse
     TOGGLE  := $(BUILD)/pulse-toggle
+    CMAKE_EXTRA :=
 else
     BUILD   := build_win
     BIN     := $(BUILD)/Release/pulse.exe
     TOGGLE  := $(BUILD)/Release/pulse-toggle.exe
+    CMAKE_EXTRA :=
 endif
 
 .PHONY: build run toggle clean configure \
@@ -21,7 +24,7 @@ endif
 
 # Auto-configure if build directory is missing
 $(BUILD)/CMakeCache.txt:
-	cmake -B $(BUILD) -S . -DCMAKE_BUILD_TYPE=Release
+	cmake -B $(BUILD) -S . -DCMAKE_BUILD_TYPE=Release $(CMAKE_EXTRA)
 
 configure: $(BUILD)/CMakeCache.txt
 
