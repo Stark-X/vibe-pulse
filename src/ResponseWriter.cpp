@@ -1,7 +1,5 @@
 #include "ResponseWriter.h"
 
-#include <unistd.h>
-
 #include <QDateTime>
 #include <QDir>
 #include <QJsonDocument>
@@ -33,7 +31,7 @@ static QString responsePath(const QString &sessionId, const QString &interaction
 
     const QByteArray runtime = qgetenv("XDG_RUNTIME_DIR");
     const QString base = runtime.isEmpty()
-        ? QStringLiteral("/tmp/pulse-%1").arg(static_cast<uint>(getuid()))
+        ? QDir::tempPath() + QStringLiteral("/pulse")
         : QString::fromLocal8Bit(runtime) + QStringLiteral("/pulse");
 
     const QString dir = base + QLatin1Char('/') + sid;

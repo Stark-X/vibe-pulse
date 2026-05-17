@@ -17,7 +17,8 @@ std::optional<TmuxPaneInfo> TmuxResolver::findPaneInfo(quint32 agentPid)
     const QVector<quint32> chain = ProcessTree::ancestorChain(agentPid);
     bool inWsl = false;
     for (quint32 p : chain) {
-        if (ProcessTree::comm(p).compare(QStringLiteral("wsl.exe"),
+        // ProcessTree::comm() on Windows returns exe basename without extension
+        if (ProcessTree::comm(p).compare(QStringLiteral("wsl"),
                                          Qt::CaseInsensitive) == 0) {
             inWsl = true;
             break;

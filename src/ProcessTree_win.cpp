@@ -69,16 +69,4 @@ QString ProcessTree::cwd(quint32) { return {}; }
 // Return empty for now; agent detection uses comm/exe matching only.
 QStringList ProcessTree::cmdline(quint32) { return {}; }
 
-QVector<quint32> ProcessTree::ancestorChain(quint32 startPid, int maxDepth)
-{
-    QVector<quint32> chain;
-    chain.reserve(maxDepth + 1);
-    chain.append(startPid);
-    for (int i = 0; i < maxDepth; ++i) {
-        const quint32 parent = ppid(chain.last());
-        if (parent == 0 || chain.contains(parent))
-            break;
-        chain.append(parent);
-    }
-    return chain;
-}
+// ancestorChain is implemented in ProcessTree.cpp (shared)

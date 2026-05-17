@@ -129,7 +129,9 @@ QVector<AgentInfo> ProcScanner::scanAll()
             a.pid         = pid;
             a.status      = QStringLiteral("running");
             a.cwd         = cwd;
-            a.name        = cwd.isEmpty() ? QStringLiteral("?") : QFileInfo(cwd).fileName();
+            a.name        = !cwd.isEmpty()  ? QFileInfo(cwd).fileName()
+                          : !exe.isEmpty()  ? QFileInfo(exe).completeBaseName()
+                          : comm;
             a.sessionBusy = true;
 
             result.append(a);
@@ -145,18 +147,6 @@ QVector<AgentInfo> ProcScanner::scanAll()
 
 // ── dedup ─────────────────────────────────────────────────────────────────────
 
-static bool hasAncestorInSet(quint32 pid, const QVector<quint32> &pids, int depth = 0)
-{
-    if (depth > 16)
-        return false;
-    const quint32 parent = ProcessTree::ppid(pid);
-    if (parent == 0 || parent == 1)
-        return false;
-    if (pids.contains(parent))
-        return true;
-    return hasAncestorInSet(parent, pids, depth + 1);
-}
-
 void ProcScanner::dedup(QVector<AgentInfo> &agents)
 {
     QHash<QString, QVector<quint32>> byType;
@@ -168,9 +158,15 @@ void ProcScanner::dedup(QVector<AgentInfo> &agents)
         const QVector<quint32> &pids = it.value();
         if (pids.size() < 2)
             continue;
-        for (quint32 pid : pids)
-            if (hasAncestorInSet(pid, pids))
-                toRemove.append(pid);
+        for (quint32 pid : pids) {
+            const QVector<quint32> chain = ProcessTree::ancestorChain(pid);
+            for (int i = 1; i < chain.size(); ++i) {
+                if (pids.contains(chain[i])) {
+                    toRemove.append(pid);
+                    break;
+                }
+            }
+        }
     }
 
     agents.erase(

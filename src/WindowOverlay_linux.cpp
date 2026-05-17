@@ -3,15 +3,16 @@
 
 #include <QWindow>
 
+#include <memory>
+
 class LinuxWindowOverlay final : public WindowOverlay {
-    WaylandLayerShell *m_shell = nullptr;
+    std::unique_ptr<WaylandLayerShell> m_shell;
 public:
     void setup(QWindow *win) override {
-        m_shell = new WaylandLayerShell(win);
+        m_shell = std::make_unique<WaylandLayerShell>(win);
         if (!m_shell->isValid())
             qWarning("pulse: layer-shell unavailable, running as normal window");
     }
-    ~LinuxWindowOverlay() override { delete m_shell; }
 };
 
 std::unique_ptr<WindowOverlay> WindowOverlay::create()

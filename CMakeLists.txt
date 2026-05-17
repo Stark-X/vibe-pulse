@@ -17,7 +17,7 @@ set(PULSE_COMMON_SOURCES
     src/main.cpp
     src/AgentInfo.h
     src/AgentModel.h         src/AgentModel.cpp
-    src/ProcessTree.h
+    src/ProcessTree.h        src/ProcessTree.cpp
     src/ProcScanner.h        src/ProcScanner.cpp
     src/TmuxResolver.h
     src/WindowManager.h      src/WindowManager.cpp

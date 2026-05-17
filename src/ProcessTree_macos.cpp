@@ -83,16 +83,4 @@ quint32 ProcessTree::ppid(quint32 pid)
     return static_cast<quint32>(info.pbi_ppid);
 }
 
-QVector<quint32> ProcessTree::ancestorChain(quint32 startPid, int maxDepth)
-{
-    QVector<quint32> chain;
-    chain.reserve(maxDepth + 1);
-    chain.append(startPid);
-    for (int i = 0; i < maxDepth; ++i) {
-        const quint32 parent = ppid(chain.last());
-        if (parent == 0 || parent == 1 || chain.contains(parent))
-            break;
-        chain.append(parent);
-    }
-    return chain;
-}
+// ancestorChain is implemented in ProcessTree.cpp (shared)
