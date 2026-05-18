@@ -113,3 +113,12 @@
 - 定位延迟 0ms+1000ms 两次触发，应对 MacBook 启动后 NSNotification 洪泛
 - QML 左 HUD 宽度 48→64px，右 HUD 32→60px，新增脉冲动画和百分比文字
 **Files:** qml/NotchLeftHUD.qml, qml/NotchRightHUD.qml, src/NotchGeometry.h, src/NotchGeometry.mm, src/WindowOverlay.h, src/WindowOverlay_macos.mm, src/main.cpp
+
+## eb2adb19 · 2026-05-19 · master
+
+**✨ feat(qml): 优化 Dynamic Island 展开动效**
+
+- 统一背景改为 Canvas，topCornerR +16→-20 驱动胶囊↔面板形变
+- 展开顶角向外凸角 r=20，底角 r=16；修正上版本的凹角方向错误
+- 内容延迟淡入：100ms pause + 200ms OutCubic，形状先行
+- 宽度 OutBack(overshoot=0.4) 增加弹性感

@@ -58,7 +58,7 @@ Window {
     property real animatedH: compactH
 
     Behavior on height { NumberAnimation { duration: 280; easing.type: Easing.OutQuint } }
-    Behavior on width { NumberAnimation { duration: 280; easing.type: Easing.OutQuint } }
+    Behavior on width  { NumberAnimation { duration: 320; easing.type: Easing.OutBack; easing.overshoot: 0.4 } }
     onTargetHChanged: animatedH = targetH
 
     // Auto-expand for attention states
@@ -109,15 +109,82 @@ Window {
         return "#8b88a8"
     }
 
-    // Background pill shape
+    // Unified background drawn with Canvas so we can morph between:
+    //   compact  → pill (convex top corners, topCornerR = +16)
+    //   expanded → inverse-corner shape (concave top corners, topCornerR = -12)
+    // The top corners animate through 0 (flat) on the way — unnoticeable mid-expansion.
+    Canvas {
+        id: bg
+        anchors.fill: parent
+
+        // Positive = convex top radius (pill), negative = concave top radius (island)
+        property real topCornerR: root.fusionMode === "compact" ? 16 : -20
+        Behavior on topCornerR { NumberAnimation { duration: 280; easing.type: Easing.OutQuint } }
+
+        onTopCornerRChanged: requestPaint()
+        onWidthChanged:      requestPaint()
+        onHeightChanged:     requestPaint()
+
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.clearRect(0, 0, width, height)
+            ctx.fillStyle = "#0a0a0c"
+
+            var tR = topCornerR          // positive = convex, negative = concave
+            var bR = 16                  // bottom corners always convex
+            var w  = width
+            var h  = height
+
+            ctx.beginPath()
+
+            if (tR > 0) {
+                // Compact pill: all convex, top radius capped at h/2 for true pill
+                var r = Math.min(tR, h / 2, w / 2)
+                ctx.moveTo(r, 0)
+                ctx.lineTo(w - r, 0)
+                ctx.arc(w - r, r,      r,  -Math.PI / 2, 0,           false)
+                ctx.lineTo(w, h - bR)
+                ctx.arc(w - bR, h - bR, bR, 0,           Math.PI / 2, false)
+                ctx.lineTo(bR, h)
+                ctx.arc(bR, h - bR,    bR,  Math.PI / 2, Math.PI,     false)
+                ctx.lineTo(0, r)
+                ctx.arc(r, r,          r,   Math.PI,     -Math.PI / 2, false)
+            } else if (tR < 0) {
+                // Expanded island: larger convex top corners (向外) + standard convex bottom corners
+                var cR = -tR
+                ctx.moveTo(cR, 0)
+                ctx.lineTo(w - cR, 0)
+                ctx.arc(w - cR, cR,     cR, -Math.PI / 2, 0,          false) // convex TR
+                ctx.lineTo(w, h - bR)
+                ctx.arc(w - bR, h - bR, bR,  0,          Math.PI / 2, false) // convex BR
+                ctx.lineTo(bR, h)
+                ctx.arc(bR,    h - bR,  bR,  Math.PI / 2, Math.PI,    false) // convex BL
+                ctx.lineTo(0, cR)
+                ctx.arc(cR,    cR,      cR,  Math.PI,    -Math.PI / 2, false) // convex TL
+            } else {
+                // tR ≈ 0: flat top edge (momentary during transition)
+                ctx.moveTo(0, 0)
+                ctx.lineTo(w, 0)
+                ctx.lineTo(w, h - bR)
+                ctx.arc(w - bR, h - bR, bR, 0,          Math.PI / 2, false)
+                ctx.lineTo(bR, h)
+                ctx.arc(bR, h - bR,    bR,  Math.PI / 2, Math.PI,    false)
+                ctx.lineTo(0, 0)
+            }
+
+            ctx.closePath()
+            ctx.fill()
+        }
+    }
+
+    // Top content strip — transparent, relies on bg above for the visual background
     Rectangle {
         id: band
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
         height: bandH
-        color: "#0a0a0c"
-        radius: height / 2
+        color: "transparent"
 
         // Click to toggle compact/list
         MouseArea {
@@ -261,6 +328,16 @@ Window {
         anchors.right: parent.right
         active: fusionMode === "list"
         sourceComponent: listComp
+        opacity: 0
+
+        onActiveChanged: if (!active) opacity = 0
+        onLoaded: expandReveal.restart()
+
+        SequentialAnimation {
+            id: expandReveal
+            PauseAnimation   { duration: 100 }
+            NumberAnimation  { target: expandedLoader; property: "opacity"; to: 1.0; duration: 200; easing.type: Easing.OutCubic }
+        }
 
         onItemChanged: {
             if (item) {
@@ -276,13 +353,6 @@ Window {
             Item {
                 id: listContent
                 implicitHeight: Math.min(agentList.implicitHeight, 280) + 32
-
-                // Rounded bottom corners
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 16
-                    color: "#0a0a0c"
-                }
 
                 Column {
                     id: agentList
@@ -389,6 +459,17 @@ Window {
         anchors.left: parent.left
         anchors.right: parent.right
         active: fusionMode === "detail"
+        opacity: 0
+
+        onActiveChanged: if (!active) opacity = 0
+        onLoaded: detailReveal.restart()
+
+        SequentialAnimation {
+            id: detailReveal
+            PauseAnimation  { duration: 100 }
+            NumberAnimation { target: detailLoader; property: "opacity"; to: 1.0; duration: 200; easing.type: Easing.OutCubic }
+        }
+
         sourceComponent: {
             if (detailMode === "permission") return permComp
             if (detailMode === "question")  return questComp
