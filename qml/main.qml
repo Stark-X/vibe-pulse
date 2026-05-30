@@ -60,8 +60,8 @@ Window {
         anchors { top: parent.top; right: parent.right }
         width:  Math.round(root.animCardW)
         height: parent.height
-        color: Qt.rgba(0.078, 0.075, 0.11, 0.93)
-        border.color: "#3a384e"
+        color: Theme.bg0
+        border.color: Theme.border
         border.width: 1
         radius: isExpanded ? Theme.pulseRadius : root.dotD / 2
         clip: true
@@ -95,27 +95,44 @@ Window {
                 border.color: root.stateColor
                 border.width: 1.5
                 opacity: 0
+                antialiasing: true
 
                 Behavior on border.color { ColorAnimation { duration: 300 } }
 
                 SequentialAnimation on scale {
                     loops: Animation.Infinite
-                    NumberAnimation { from: 1.0; to: 2.4; duration: 2200; easing.type: Easing.OutCubic }
+                    running: !root.isExpanded
+                    NumberAnimation { from: 1.0; to: 1.8; duration: 1800; easing.type: Easing.OutExpo }
                 }
                 SequentialAnimation on opacity {
                     loops: Animation.Infinite
-                    NumberAnimation { from: 0.6; to: 0; duration: 2200; easing.type: Easing.OutCubic }
+                    running: !root.isExpanded
+                    NumberAnimation { from: 0.35; to: 0; duration: 1800; easing.type: Easing.OutExpo }
+                }
+            }
+
+            Rectangle {
+                visible: agentModel.workingCount === 0
+                anchors.centerIn: parent
+                width: 8; height: 8; radius: 4
+                color: root.stateColor
+                antialiasing: true
+                Behavior on color { ColorAnimation { duration: 300 } }
+
+                SequentialAnimation on scale {
+                    loops: Animation.Infinite
+                    running: !root.isExpanded
+                    NumberAnimation { from: 1.0; to: 1.05; duration: 1000; easing.type: Easing.InOutSine }
+                    NumberAnimation { from: 1.05; to: 1.0; duration: 1000; easing.type: Easing.InOutSine }
                 }
             }
 
             Text {
-                anchors.centerIn: parent
-                text: agentModel.workingCount + "/" + agentModel.count
-                font.family: "JetBrains Mono"
-                font.pixelSize: 12
-                font.weight: Font.Medium
+                text: agentModel.workingCount > 0 ? agentModel.workingCount : ""
+                font.pixelSize: 13
+                font.weight: Font.Bold
                 color: root.stateColor
-                Behavior on color { ColorAnimation { duration: 300 } }
+                anchors.centerIn: parent
             }
         }
 

@@ -39,6 +39,7 @@ QtObject {
     readonly property int s3: 12
     readonly property int s4: 16
     readonly property int s5: 24
+    readonly property string fontSans: Qt.platform.os === "osx" ? "-apple-system" : "system-ui"
 
     // Agent name → deterministic accent color
     function agentAccent(name) {
