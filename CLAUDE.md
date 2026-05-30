@@ -1,7 +1,6 @@
 # Pulse — AI Agent Monitor
 
-Qt6/QML floating overlay for monitoring AI coding agents (Claude Code, Codex, OpenCode).
-Supports macOS, Linux (Wayland/Hyprland), and Windows (stub).
+Qt6/QML 悬浮覆层，监控 AI 编码 Agent（Claude Code、Codex、OpenCode）。支持 macOS、Linux (Wayland/Hyprland)、Windows (stub)。
 
 ---
 
@@ -9,13 +8,13 @@ Supports macOS, Linux (Wayland/Hyprland), and Windows (stub).
 
 | 日期 | 变更 |
 |------|------|
-| 2026-05-30 | 初次生成完整 CLAUDE.md；涵盖 src/、qml/、pulse-toggle/、openspec/ 全模块扫描结果 |
+| 2026-05-30 | 初次生成 CLAUDE.md；全模块扫描 |
 
 ---
 
 ## 项目愿景
 
-Pulse 是一个轻量级桌面悬浮覆层，实时显示当前运行的 AI 编码 Agent（Claude Code、Codex、OpenCode）的状态——正在工作、等待权限确认、提问、共享计划——并允许用户直接从覆层批准/拒绝操作，无需切换终端窗口。
+Pulse：轻量桌面覆层，实时显 AI Agent 状态（工作/待权/提问/计划），覆层内直接批准/拒绝，无需切终端。
 
 ---
 
@@ -126,12 +125,12 @@ graph TD
 
 | 模块 | 路径 | 职责 |
 |------|------|------|
-| 核心 C++ 后端 | `src/` | 进程扫描、状态读取、数据模型、平台接口 |
-| QML 前端 | `qml/` | 悬浮覆层 UI：标题栏、各交互视图、主题系统 |
-| IPC 控制工具 | `pulse-toggle/` | 命令行客户端，发送 show/hide/toggle 指令 |
-| 变更规格文档 | `openspec/changes/` | 各功能的设计/提案/任务追踪文档 |
-| Wayland 协议 | `protocols/` | `wlr-layer-shell-unstable-v1.xml`（Wayland 层 shell 协议） |
-| 静态资源 | `assets/` | Claude Code、Codex 品牌图标 |
+| 核心 C++ 后端 | `src/` | 进程扫描/状态读取/模型/平台接口 |
+| QML 前端 | `qml/` | 覆层UI：标题栏/视图/主题 |
+| IPC 控制工具 | `pulse-toggle/` | CLI客户端，发 show/hide/toggle |
+| 变更规格文档 | `openspec/changes/` | 功能设计/提案/任务文档 |
+| Wayland 协议 | `protocols/` | `wlr-layer-shell-unstable-v1.xml`（Wayland层shell协议） |
+| 静态资源 | `assets/` | CC/Codex 图标 |
 
 ---
 
@@ -142,8 +141,8 @@ graph TD
 | 平台 | 依赖 |
 |------|------|
 | 全平台 | Qt6 >= 6.4（Core / Gui / Qml / Quick / Network）、CMake >= 3.16、C++17 |
-| Linux | `wayland-client`、`wayland-scanner`、Hyprland（可选，用于窗口跳转） |
-| macOS | Xcode CLT、AppKit、Foundation（通过 Homebrew 安装的 Qt6） |
+| Linux | `wayland-client`、`wayland-scanner`、Hyprland（可选） |
+| macOS | Xcode CLT、AppKit、Foundation（Homebrew Qt6） |
 | Windows | MSVC 2022、psapi |
 
 ### 构建命令
@@ -168,13 +167,13 @@ make mock-subscription   # 模拟订阅用量 CC=45% CD=31%
 
 | 变量 | 说明 |
 |------|------|
-| `PULSE_MOCK=<scene>` | 注入静态 mock 快照（idle/working/permission/question/plan/expanded） |
-| `PULSE_DEMO=1` | 演示模式：跳过 meta 读取，仅显示进程扫描结果 |
-| `PULSE_MOCK_SUBSCRIPTION=CC=N,CD=N` | mock 订阅用量百分比 |
+| `PULSE_MOCK=<scene>` | 注入 mock 快照（idle/working/permission/question/plan/expanded） |
+| `PULSE_DEMO=1` | 演示模式：跳过meta，仅扫进程 |
+| `PULSE_MOCK_SUBSCRIPTION=CC=N,CD=N` | mock订阅用量% |
 
 ### macOS 特殊步骤
 
-CMake 会自动通过 `brew --prefix qt` 查找 Qt。如果路径不同：
+CMake 自动通过 `brew --prefix qt` 找Qt，路径不同时：
 ```bash
 cmake -B build_mac -S . -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt -DCMAKE_BUILD_TYPE=Release
 ```
@@ -183,31 +182,31 @@ cmake -B build_mac -S . -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt -DCMAKE_BUILD_T
 
 ## 测试策略
 
-目前无自动化测试（无 `tests/` 目录）。质量验证依赖：
+无自动化测试（无 `tests/`）。质量验证：
 
-1. **Mock 场景**：`make mock-<scene>` 覆盖所有 UI 状态，视觉验证动效和布局
-2. **编译验证**：`make build` 确保无编译错误（C++ 静态类型检查）
-3. **真实运行验证**：启动真实的 Claude Code / Codex 进程后运行 pulse 验证状态读取
+1. **Mock**：`make mock-<scene>` 覆盖全UI状态，视觉验证
+2. **编译**：`make build` 无错（C++静态检查）
+3. **真实运行**：启动真实Agent后运pulse验证状态
 
 ---
 
 ## 编码规范
 
-详见 `.context/prefs/coding-style.md`，核心规则：
+详见 `.context/prefs/coding-style.md`，核心：
 
 - 函数 < 50 行，嵌套 ≤ 3 层
-- 平台特定代码放 `_linux.cpp` / `_macos.cpp` / `_win.cpp` 文件，不用 `#ifdef` 污染共享文件
+- 平台代码放 `_linux.cpp`/`_macos.cpp`/`_win.cpp`，不用 `#ifdef` 污染共享文件
 - Git 提交遵循 Conventional Commits + emoji 前缀
-- 不记录 secrets（token、key、cookie 等）到日志
-- 做决策时追加到 `.context/history/` 记录选择理由
+- 不记录 secrets 到日志
+- 决策追加至 `.context/history/`
 
 ---
 
 ## AI 使用指引
 
-1. **修改代码前**必读 `.context/prefs/coding-style.md` 和 `.context/prefs/workflow.md`
-2. **功能变更**遵循 openspec 流程：在 `openspec/changes/<feature>/` 下创建 proposal → design → tasks
-3. **平台相关修改**：Linux 用 `ProcessTree_linux.cpp`，macOS 用 `ProcessTree_macos.cpp`，共享逻辑放 `ProcessTree.h` 接口
-4. **QML 修改**：通过 `make mock-<scene>` 验证所有状态下的视觉效果
-5. **Mock 场景**已覆盖所有 `PulseState` 枚举值，添加新状态时同步更新 `buildMockSnapshot()`
+1. **改码前**必读 `.context/prefs/coding-style.md` + `.context/prefs/workflow.md`
+2. **功能变更**走 openspec：`openspec/changes/<feature>/` 建 proposal→design→tasks
+3. **平台修改**：Linux→`ProcessTree_linux.cpp`，macOS→`ProcessTree_macos.cpp`，共享→`ProcessTree.h`
+4. **QML改**：`make mock-<scene>` 验视觉
+5. **Mock**：覆盖全 `PulseState`，添新状态同步更新 `buildMockSnapshot()`
 6. **IPC 格式**：`pulse-ipc` QLocalSocket，JSON payload `{"cmd": "toggle"|"show"|"hide"}`

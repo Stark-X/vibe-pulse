@@ -17,9 +17,9 @@ Qt6 C++ 后端，负责进程扫描、Agent 状态读取、数据模型、平台
 ## 模块职责
 
 - 每 2 秒轮询系统进程，识别 `claude` / `codex` 可执行文件
-- 读取 `~/.claude/sessions/` JSON 和 `~/.claude/projects/*/` JSONL，解析当前工具调用状态
-- 将状态映射到 `PulseState` 枚举，驱动 QML 视图切换
-- 通过 `ResponseWriter` 把用户决策写回 Agent 的 session 文件（问答、计划审批、权限决定）
+- 读 `~/.claude/sessions/` JSON 和 `~/.claude/projects/*/` JSONL，解析当前工具调用状态
+- 状态映射 `PulseState` 枚举，驱动 QML 视图切换
+- 通过 `ResponseWriter` 写回 Agent session 文件（问答、计划审批、权限决定）
 - 平台窗口管理（Hyprland IPC / macOS NSRunningApplication / NullWM）
 
 ---
@@ -28,7 +28,7 @@ Qt6 C++ 后端，负责进程扫描、Agent 状态读取、数据模型、平台
 
 **`src/main.cpp`** — 应用入口
 
-关键启动流程：
+启动流程：
 1. 创建 `WindowManager`（工厂方法，自动检测平台）
 2. 创建 `AgentModel`、`Settings`、`ProcScanner`、`SubscriptionMonitor`
 3. 设置 `QFileSystemWatcher`（监视 `~/.claude/sessions/` + 活跃 JSONL）
@@ -43,7 +43,7 @@ Qt6 C++ 后端，负责进程扫描、Agent 状态读取、数据模型、平台
 
 ### AgentInfo（`AgentInfo.h`）
 
-核心数据结构，每个 Agent 一个实例：
+核心数据结构，每 Agent 一实例：
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -55,11 +55,11 @@ Qt6 C++ 后端，负责进程扫描、Agent 状态读取、数据模型、平台
 | `currentStep` | `QString` | 当前工具调用描述（如 `"Edit · src/foo.cpp"`） |
 | `contextUsed` | `int` | Claude context 已用 token 数 |
 | `contextLimit` | `int` | Claude context 上限（默认 200000） |
-| `questionPrompt` | `QString` | 待回答的问题文本 |
+| `questionPrompt` | `QString` | 待回答问题文本 |
 | `questionOptions` | `QStringList` | 选项列表 |
 | `planTitle` | `QString` | 计划标题 |
-| `planHtml` | `QString` | Markdown 转换后的 HTML |
-| `permissionTool` | `QString` | 需要授权的工具名（Edit/Bash/Write） |
+| `planHtml` | `QString` | Markdown 转换后 HTML |
+| `permissionTool` | `QString` | 需授权工具名（Edit/Bash/Write） |
 | `permissionTarget` | `QString` | 操作目标（文件路径或命令） |
 | `interactionId` | `QString` | 工具调用 ID，用于写回 |
 | `windowAddress` | `QString` | 窗口 ID（Hyprland 地址或 macOS PID 字符串） |
@@ -107,8 +107,8 @@ QML context properties（由 `main.cpp` 注入）：
 ### ProcScanner（`ProcScanner.h/cpp`）
 
 - 静态方法 `scanAll()` 枚举所有 PID，过滤 comm/exe 匹配 `claude`/`codex`/`opencode`
-- 启动后每 2 秒发 `snapshotReady` 信号
-- 使用 `ProcessTree` 获取跨平台进程信息
+- 每 2 秒发 `snapshotReady` 信号
+- 用 `ProcessTree` 获取跨平台进程信息
 
 ### ProcessTree（`ProcessTree.h`，实现分平台）
 
@@ -122,15 +122,15 @@ QML context properties（由 `main.cpp` 注入）：
 
 ### ClaudeMetaReader（`ClaudeMetaReader.h/cpp`）
 
-读取 `~/.claude/sessions/<pid>.json` 或按 cwd 匹配最新 session 文件，再读对应 JSONL：
-- 解析 `waitingFor` 字段判断 session 状态
+读 `~/.claude/sessions/<pid>.json` 或按 cwd 匹配最新 session 文件，再读对应 JSONL：
+- 解析 `waitingFor` 判断 session 状态
 - 从 JSONL 末尾 32KB 提取最后一条 `assistant` 消息，识别工具调用类型
-- 支持的工具调用：`AskUserQuestion` → Question、`ExitPlanMode` → Plan、`Edit/Write/MultiEdit/Bash` → Permission
+- 支持：`AskUserQuestion` → Question、`ExitPlanMode` → Plan、`Edit/Write/MultiEdit/Bash` → Permission
 - 解析 context usage（`input_tokens + cache_*`）
 
 ### ResponseWriter（`ResponseWriter.h/cpp`）
 
-写回 Agent 决策，文件路径 `~/.claude/projects/<enc-cwd>/<sessionId>.jsonl`（通过 `user` 类型行追加）：
+写回 Agent 决策，路径 `~/.claude/projects/<enc-cwd>/<sessionId>.jsonl`（追加 `user` 类型行）：
 - `writeQuestionAnswer(sessionId, interactionId, optionIndex, answer)`
 - `writePlanDecision(sessionId, interactionId, decision, comment)`
 - `writePermissionDecision(sessionId, interactionId, allow, amendment)`
@@ -144,26 +144,26 @@ WindowManager (abstract)
 └── NullWindowManager        fallback，no-op（Windows / 非 Hyprland Linux）
 ```
 
-工厂方法 `WindowManager::create()` 在运行时检测平台，选择实现。
+工厂方法 `WindowManager::create()` 运行时检测平台，选择实现。
 
 ### WaylandLayerShell（`WaylandLayerShell.h/cpp`，仅 Linux）
 
-实现 `wlr-layer-shell-unstable-v1` 协议，将 pulse 窗口挂载到 Wayland compositor 的 overlay 层，保持全局可见（不被其他窗口遮挡）。
+实现 `wlr-layer-shell-unstable-v1` 协议，将 pulse 窗口挂载到 Wayland compositor overlay 层，保持全局可见。
 
 ### TmuxResolver（`TmuxResolver.h` + `TmuxResolver.cpp`）
 
-当 Agent 运行在 tmux pane 中时，通过 `tmux list-panes -a` 找到 pane PID，再追溯终端模拟器 PID，最终映射到 WindowManager 可识别的窗口地址。
+Agent 运行在 tmux pane 时，通过 `tmux list-panes -a` 找 pane PID，追溯终端模拟器 PID，映射到 WindowManager 可识别窗口地址。
 
 ### SubscriptionMonitor（`SubscriptionMonitor.h/cpp`）
 
-定时轮询 Claude / Codex API，获取订阅用量百分比，暴露给 HeaderBar 显示：
+定时轮询 Claude / Codex API，获取订阅用量百分比，暴露给 HeaderBar：
 - `claudeUtilization`: 0.0–100.0
 - `codexUtilization`: 0.0–100.0
-- 支持 `PULSE_MOCK_SUBSCRIPTION=CC=N,CD=N` 环境变量 mock
+- 支持 `PULSE_MOCK_SUBSCRIPTION=CC=N,CD=N` mock
 
 ### MiniMd（`MiniMd.h/cpp`）
 
-轻量 Markdown → HTML 转换器，用于 `PlanView` 渲染计划内容（无依赖外部库）。
+轻量 Markdown → HTML 转换器，用于 `PlanView` 渲染计划内容（无外部库依赖）。
 
 ---
 

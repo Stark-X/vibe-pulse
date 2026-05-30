@@ -2,7 +2,7 @@
 
 # openspec/ — 变更规格文档
 
-使用 OpenSpec 格式管理所有功能变更的提案、设计、规格和任务追踪。
+用 OpenSpec 管所有功能变更：提案、设计、规格、任务追踪。
 
 ---
 
@@ -16,9 +16,9 @@
 
 ## 模块职责
 
-- 每个功能变更有独立的子目录，包含 proposal → design → specs → tasks 四层文档
-- tasks.md 使用 `- [x]` 追踪实现进度
-- 归档完成的变更到 `changes/archive/`
+- 每变更独立子目录，含 proposal → design → specs → tasks 四层文档
+- tasks.md 用 `- [x]` 追踪进度
+- 完成后归档到 `changes/archive/`
 
 ---
 
@@ -40,7 +40,7 @@
 
 ## OpenSpec 工作流
 
-通过 `.claude/commands/opsx/` 中的命令操作：
+命令在 `.claude/commands/opsx/`：
 
 ```bash
 /propose <feature>   # 创建 proposal.md
