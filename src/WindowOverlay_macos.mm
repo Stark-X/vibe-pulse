@@ -20,12 +20,17 @@ public:
             NSWindowCollectionBehaviorStationary        |
             NSWindowCollectionBehaviorIgnoresCycle];
         [nswin setHidesOnDeactivate: NO];
+        // Allow hover events without requiring the window to be clicked first
+        [nswin setAcceptsMouseMovedEvents: YES];
 
-        // Position top-right of primary screen
+        // Position so right edge sits margin px from screen right.
+        // Use the full panel width (not win->width which equals dotD at startup)
+        // so the window stays fixed and the card expands leftward on hover.
         const QRect avail = QGuiApplication::primaryScreen()->availableGeometry();
-        const int margin = 12;
-        win->setPosition(avail.right()  - win->width()  - margin,
-                         avail.top() + margin);
+        const int margin    = 12;
+        const int panelW    = 320; // must match main.qml listW
+        win->setPosition(avail.right() - panelW - margin,
+                         avail.top()  + margin);
     }
 };
 

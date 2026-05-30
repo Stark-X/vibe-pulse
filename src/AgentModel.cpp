@@ -69,6 +69,14 @@ QHash<int, QByteArray> AgentModel::roleNames() const
     };
 }
 
+int AgentModel::workingCount() const
+{
+    int n = 0;
+    for (const auto &a : m_agents)
+        if (a.sessionBusy) ++n;
+    return n;
+}
+
 QVariant AgentModel::data(const QModelIndex &idx, int role) const
 {
     if (!idx.isValid() || idx.row() >= m_agents.size())

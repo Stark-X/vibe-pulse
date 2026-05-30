@@ -11,6 +11,7 @@ class AgentModel : public QAbstractListModel
 {
     Q_OBJECT
     Q_PROPERTY(int     count          READ rowCount       NOTIFY countChanged)
+    Q_PROPERTY(int     workingCount   READ workingCount   NOTIFY globalStateChanged)
     Q_PROPERTY(QString globalState    READ globalState    NOTIFY globalStateChanged)
     Q_PROPERTY(int     activeAgentRow READ activeAgentRow NOTIFY globalStateChanged)
     Q_PROPERTY(bool    idleCollapsed  READ idleCollapsed  NOTIFY globalStateChanged)
@@ -49,6 +50,7 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     QString globalState()    const;
+    int     workingCount()   const;
     int     activeAgentRow() const;
     bool    idleCollapsed()  const;
 

@@ -6,6 +6,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkRequest>
+#include <QProcess>
 #include <QUrl>
 
 static constexpr int kStartDelayMs   = 5000;
@@ -73,20 +74,22 @@ void SubscriptionMonitor::refreshAll()
 
 // ── Claude ──────────────────────────────────────────────────────────────────
 
-bool SubscriptionMonitor::loadClaudeCredential(QString &outToken) const
+// Parse accessToken from a Claude credentials JSON blob (supports both key names)
+static bool parseClaudeCredentialJson(const QByteArray &json, QString &outToken)
 {
-    const QString path = QDir::homePath() + QStringLiteral("/.claude/.credentials.json");
-    QFile f(path);
-    if (!f.open(QIODevice::ReadOnly))
-        return false;
-
     QJsonParseError err;
-    const QJsonDocument doc = QJsonDocument::fromJson(f.readAll(), &err);
+    const QJsonDocument doc = QJsonDocument::fromJson(json, &err);
     if (err.error != QJsonParseError::NoError || !doc.isObject())
         return false;
 
-    const QJsonObject oauth = doc.object()
-        .value(QStringLiteral("claudeAiOauth")).toObject();
+    const QJsonObject root = doc.object();
+    // Support both key name variants used across Claude Code versions
+    QJsonObject oauth = root.value(QStringLiteral("claudeAiOauth")).toObject();
+    if (oauth.isEmpty())
+        oauth = root.value(QStringLiteral("claude.ai_oauth")).toObject();
+    if (oauth.isEmpty())
+        return false;
+
     const QString token = oauth.value(QStringLiteral("accessToken")).toString();
     if (token.isEmpty())
         return false;
@@ -102,13 +105,38 @@ bool SubscriptionMonitor::loadClaudeCredential(QString &outToken) const
     return true;
 }
 
+bool SubscriptionMonitor::loadClaudeCredential(QString &outToken) const
+{
+#ifdef Q_OS_MACOS
+    // New Claude Code versions store credentials in macOS Keychain
+    QProcess proc;
+    proc.start(QStringLiteral("security"),
+               {QStringLiteral("find-generic-password"),
+                QStringLiteral("-s"), QStringLiteral("Claude Code-credentials"),
+                QStringLiteral("-w")});
+    if (proc.waitForFinished(1500) && proc.exitCode() == 0) {
+        const QByteArray keychainJson = proc.readAllStandardOutput().trimmed();
+        if (!keychainJson.isEmpty() && parseClaudeCredentialJson(keychainJson, outToken))
+            return true;
+    }
+#endif
+
+    // Fallback: credential file (older Claude Code versions)
+    const QString path = QDir::homePath() + QStringLiteral("/.claude/.credentials.json");
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+        return false;
+
+    return parseClaudeCredentialJson(f.readAll(), outToken);
+}
+
 void SubscriptionMonitor::refreshClaude()
 {
     if (m_claudeReply) return;
 
     QString token;
     if (!loadClaudeCredential(token)) {
-        setClaudeState(false);
+        // No credential — try again on next regular poll, no error state
         return;
     }
 
@@ -131,7 +159,12 @@ void SubscriptionMonitor::handleClaudeReply(QNetworkReply *reply)
 {
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (reply->error() != QNetworkReply::NoError || status >= 300) {
-        setClaudeState(false);
+        if (status == 429) {
+            // Rate limited — retry after 30 s instead of waiting the full poll interval
+            QTimer::singleShot(30000, this, &SubscriptionMonitor::refreshClaude);
+        } else {
+            setClaudeState(false);
+        }
         return;
     }
 
