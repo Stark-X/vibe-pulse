@@ -4,9 +4,7 @@
 
 // Per-screen HUD position data, exposed to C++ for window placement.
 struct ScreenHudPos {
-    QString screenName;   // AppKit localizedName (informational only)
-    qreal screenX = 0;    // Qt global X of the screen's top-left corner
-    qreal screenY = 0;    // Qt global Y of the screen's top-left corner
+    QString screenName;   // QScreen::name() for matching
     qreal leftX   = 0;    // X position for left HUD (agent count)
     qreal rightX  = 0;    // X position for right HUD (usage gauge)
     qreal y       = 0;    // Y position for both HUDs

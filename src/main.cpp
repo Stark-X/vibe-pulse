@@ -315,67 +315,49 @@ int main(int argc, char **argv)
         return hudWin;
     };
 
-    if (notchGeo) {
-        WindowOverlay *ovl = overlay.get();
-
-        // hw points to hudWindows (defined above #ifdef Q_OS_MACOS) so the IPC
-        // toggle lambda can also capture it as a raw pointer via [=].
-        auto *hw = &hudWindows;
-
-        // Create HUD windows for any screens not yet in hw.
-        // Guarded by a static flag to prevent AppKit notification reentrance:
-        // createHudWindow → NSWindow created → AppKit notification fires →
-        // geometryChanged → repositionHuds → createHudWindows (recursive).
-        auto createMissingHudWindows = [&]() {
-            static bool creating = false;
-            if (creating) return;
-            creating = true;
-
-            const auto &positions = notchGeo->positions();
-            for (int i = hw->size() / 2; i < positions.size(); ++i) {
-                const auto &pos = positions[i];
-                QScreen *targetScreen = nullptr;
-                for (auto *s : QGuiApplication::screens()) {
-                    const QRectF sg = s->geometry();
-                    if (qAbs(sg.x() - pos.screenX) < 2 && qAbs(sg.y() - pos.screenY) < 2) {
-                        targetScreen = s;
-                        break;
-                    }
-                }
-                QWindow *lw = createHudWindow("NotchLeftHUD.qml",  OverlayOptions::NotchLeftHud);
-                QWindow *rw = createHudWindow("NotchRightHUD.qml", OverlayOptions::NotchRightHud);
-                if (lw) { if (targetScreen) lw->setScreen(targetScreen); lw->show(); hw->append(lw); }
-                if (rw) { if (targetScreen) rw->setScreen(targetScreen); rw->show(); hw->append(rw); }
-
-                FILE *dbg = fopen("/tmp/notch_qtscreens.log", "a");
-                if (dbg) {
-                    fprintf(dbg, "HUD pair %d: screen=%s Qt screen=%s\n", i,
-                            pos.screenName.toUtf8().constData(),
-                            targetScreen ? targetScreen->name().toUtf8().constData() : "(none)");
-                    fclose(dbg);
+    if (notchGeo && notchGeo->available()) {
+        // Create one HUD pair per screen
+        for (const auto &pos : notchGeo->positions()) {
+            // Find matching QScreen
+            QScreen *targetScreen = nullptr;
+            for (auto *screen : QGuiApplication::screens()) {
+                if (screen->name() == pos.screenName) {
+                    targetScreen = screen;
+                    break;
                 }
             }
-            creating = false;
-        };
+            if (!targetScreen) continue;
 
-        createMissingHudWindows();
+            QWindow *leftWin  = createHudWindow("NotchLeftHUD.qml",  OverlayOptions::NotchLeftHud);
+            QWindow *rightWin = createHudWindow("NotchRightHUD.qml", OverlayOptions::NotchRightHud);
 
-        // repositionHuds uses [=] capturing raw pointers — safe, no [&] dangling risk.
+            if (leftWin) {
+                leftWin->setScreen(targetScreen);
+                hudWindows.append(leftWin);
+            }
+            if (rightWin) {
+                rightWin->setScreen(targetScreen);
+                hudWindows.append(rightWin);
+            }
+        }
+
         auto repositionHuds = [=]() {
             const auto &positions = notchGeo->positions();
-            for (int idx = 0; idx < positions.size(); ++idx) {
-                QWindow *lw = idx*2+0 < hw->size() ? (*hw)[idx*2+0] : nullptr;
-                QWindow *rw = idx*2+1 < hw->size() ? (*hw)[idx*2+1] : nullptr;
-                if (lw) {
-                    lw->setVisible(model->rowCount() > 0);
-                    ovl->placeNotchHud(lw, static_cast<int>(positions[idx].leftX),
-                                           static_cast<int>(positions[idx].y));
+            int idx = 0;
+            for (const auto &pos : positions) {
+                // Each screen has 2 HUDs: left at (idx*2), right at (idx*2+1)
+                QWindow *leftWin  = (idx * 2 + 0 < hudWindows.size()) ? hudWindows[idx * 2 + 0] : nullptr;
+                QWindow *rightWin = (idx * 2 + 1 < hudWindows.size()) ? hudWindows[idx * 2 + 1] : nullptr;
+
+                if (leftWin) {
+                    leftWin->setPosition(static_cast<int>(pos.leftX), static_cast<int>(pos.y));
+                    leftWin->setVisible(model->rowCount() > 0);
                 }
-                if (rw) {
-                    rw->setVisible(subMon->claudeAvailable());
-                    ovl->placeNotchHud(rw, static_cast<int>(positions[idx].rightX),
-                                           static_cast<int>(positions[idx].y));
+                if (rightWin) {
+                    rightWin->setPosition(static_cast<int>(pos.rightX), static_cast<int>(pos.y));
+                    rightWin->setVisible(subMon->claudeAvailable());
                 }
+                idx++;
             }
         };
 
@@ -383,19 +365,9 @@ int main(int argc, char **argv)
         QObject::connect(model, &AgentModel::countChanged, window, repositionHuds);
         QObject::connect(subMon, &SubscriptionMonitor::dataChanged, window, repositionHuds);
 
-        // Screen added after startup (MacBook lid opened, display connected, etc.)
-        QObject::connect(static_cast<QGuiApplication *>(QGuiApplication::instance()),
-                         &QGuiApplication::screenAdded, window,
-                         [notchGeo](QScreen *) { notchGeo->refresh(); });
-
-        // Position after QML show events settle (0ms), and again at 1s for
-        // MacBook screen that appears after app startup notification flood.
-        QTimer::singleShot(0,    window, repositionHuds);
-        QTimer::singleShot(1000, window, [notchGeo, createMissingHudWindows, repositionHuds]() {
-            notchGeo->refresh();
-            createMissingHudWindows();
-            repositionHuds();
-        });
+        repositionHuds();
+        for (auto *w : hudWindows)
+            w->show();
     }
 #endif
 
@@ -442,10 +414,10 @@ int main(int argc, char **argv)
     auto *server = new QLocalServer(&app);
     server->listen(serverName);
     QObject::connect(server, &QLocalServer::newConnection, window,
-                     [server, window, &hudWindows]() {
+                     [server, window, hudWindows]() {
         QLocalSocket *conn = server->nextPendingConnection();
         QObject::connect(conn, &QLocalSocket::readyRead, window,
-                         [conn, window, &hudWindows]() {
+                         [conn, window, hudWindows]() {
             const QByteArray data = conn->readAll();
             QJsonObject obj = QJsonDocument::fromJson(data).object();
             const QString cmd = obj.value(QStringLiteral("cmd")).toString();
