@@ -204,7 +204,7 @@ public:
         objc_setAssociatedObject(nsview, kHitTestRegionsKey, arr, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 
-    void placeFusionWindow(QWindow *win, qreal x, qreal y, qreal width, qreal height) override
+    void placeFusionWindow(QWindow *win, qreal x, qreal y, qreal width) override
     {
         NSView *nsview = reinterpret_cast<NSView *>(win->winId());
         if (!nsview) return;
@@ -218,10 +218,11 @@ public:
         CGFloat targetY = primaryTop - static_cast<CGFloat>(y);
 
         [nswin setLevel: NSScreenSaverWindowLevel];
-        CGFloat h = static_cast<CGFloat>(height);
-        CGFloat w = static_cast<CGFloat>(width);
-        NSRect frame = NSMakeRect(targetX, targetY - h, w, h);
+        CGFloat h = static_cast<CGFloat>(win->height());
+        NSRect frame = NSMakeRect(targetX, targetY - h, static_cast<CGFloat>(width), h);
         [nswin setFrame: frame display: NO];
+
+        win->setWidth(static_cast<int>(width));
     }
 };
 

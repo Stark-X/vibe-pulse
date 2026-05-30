@@ -39,8 +39,7 @@ public:
     // Place a fusion widget window at (x, y) with given width.
     // Combines positioning, level restoration, and width setting in one call.
     // macOS overrides to bypass safe-area clamping; default uses setPosition.
-    virtual void placeFusionWindow(QWindow *win, qreal x, qreal y, qreal width, qreal height) {
-        Q_UNUSED(height);
+    virtual void placeFusionWindow(QWindow *win, qreal x, qreal y, qreal width) {
         win->setPosition(static_cast<int>(x), static_cast<int>(y));
         win->setWidth(static_cast<int>(width));
     }
@@ -73,8 +72,8 @@ public:
         overlay->setHitTestRegions(fusionWindow, regions);
     }
 
-    Q_INVOKABLE void placeFusionWindow(qreal x, qreal y, qreal width, qreal height) {
+    Q_INVOKABLE void placeFusionWindow(qreal x, qreal y, qreal width) {
         if (!overlay || !fusionWindow) return;
-        overlay->placeFusionWindow(fusionWindow, x, y, width, height);
+        overlay->placeFusionWindow(fusionWindow, x, y, width);
     }
 };

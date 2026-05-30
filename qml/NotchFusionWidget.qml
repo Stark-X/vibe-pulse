@@ -76,15 +76,6 @@ Window {
         }
     }
 
-    // Handle initial state (model may already be populated before QML loads)
-    function initFromModelState() {
-        var s = agentModel.globalState
-        if (s === "permission" || s === "question" || s === "plan") {
-            root.detailMode = s
-            root.fusionMode = "detail"
-        }
-    }
-
     // Hit region update — whole window is content, no pass-through needed
     onFusionModeChanged: { updateHitRegions(); positionWindow() }
     onHeightChanged: updateHitRegions()
@@ -414,13 +405,9 @@ Window {
         }
         var w = root.width
         var x, y
-        if (root.fusionMode === "compact" && hasNotch) {
-            // x = left edge of left pill content
-            x = geo.leftAreaWidth - leftW - hMargin
-            y = geo.y || 0
-        } else if (root.fusionMode === "compact") {
-            // No notch: position near left of menu bar area
-            x = 8
+        if (root.fusionMode === "compact") {
+            // Position so leftZone aligns with left auxiliary area
+            x = (geo.leftAreaWidth || 80) - leftW + hMargin
             y = geo.y || 0
         } else {
             // Expanded: center on screen
@@ -429,12 +416,11 @@ Window {
         }
         root.x = x
         root.y = y
-        overlayProxy.placeFusionWindow(x, y, w, targetH)
+        overlayProxy.placeFusionWindow(x, y, w)
         updateHitRegions()
     }
 
     Component.onCompleted: {
-        initFromModelState()
         positionWindow()
         Qt.callLater(positionWindow)
     }
