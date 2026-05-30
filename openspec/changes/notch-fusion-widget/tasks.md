@@ -41,17 +41,17 @@
 - [x] 4.1 Guard all fusion code with `#ifdef Q_OS_MACOS` — Ensure Linux/Windows compile without fusion symbols
 - [x] 4.2 Keep NotchLeftHUD.qml and NotchRightHUD.qml in build — Still used by non-fusion path (future fallback)
 - [x] 4.3 Update `demo_notch/` if needed — Verify demo still works with new NotchGeometry fields
-- [x] 4.4 Remove debug log files (`/tmp/notch_*.log`) from production code — Replace with qCDebug or remove
+- [ ] 4.4 Remove debug log files (`/tmp/notch_*.log`) from production code — Replace with qCDebug or remove
 
 ## Phase 5: Testing
 
 - [x] 5.1 Test on MacBook Pro 14"/16" with notch — Verify fusion widget appears at Y=0, content in left/right auxiliary areas (mock mode verified, real hardware pending)
-- [x] 5.2 Test click-through — Verify menu bar icons behind transparent areas are clickable (hitTest swizzle installed, needs manual interactive test)
-- [x] 5.3 Test mode cycling — Click toggles compact↔list, auto-expand/collapse for permission/question/plan (QML logic implemented, needs manual interactive test)
+- [ ] 5.2 Test click-through — Verify menu bar icons behind transparent areas are clickable
+- [ ] 5.3 Test mode cycling — Click toggles compact↔list, auto-expand/collapse for permission/question/plan
 - [ ] 5.4 Test non-notch Mac — Verify menu-bar strip mode works correctly
 - [ ] 5.5 Test multi-screen — Verify fusion widget only on built-in display
 - [ ] 5.6 Test IPC — Verify toggle/show/hide commands work correctly
 - [ ] 5.7 Test fullscreen — Verify widget stays visible in fullscreen apps
 - [ ] 5.8 Test Linux build — Verify no regression, MainCard works as before
 - [ ] 5.9 Test screen hotplug — Verify correct behavior when external display connected/disconnected
-- [x] 5.10 Test 0 agents — Verify compact mode shows empty/hidden state correctly (mock idle with 3 agents verified)
+- [ ] 5.10 Test 0 agents — Verify compact mode shows empty/hidden state correctly
