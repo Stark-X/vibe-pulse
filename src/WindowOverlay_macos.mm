@@ -218,8 +218,7 @@ public:
         CGFloat targetY = primaryTop - static_cast<CGFloat>(y);
 
         [nswin setLevel: NSScreenSaverWindowLevel];
-        CGFloat h = static_cast<CGFloat>(win->height());
-        NSRect frame = NSMakeRect(targetX, targetY - h, static_cast<CGFloat>(width), h);
+        NSRect frame = NSMakeRect(targetX, targetY - 32, static_cast<CGFloat>(width), 32);
         [nswin setFrame: frame display: NO];
 
         win->setWidth(static_cast<int>(width));
