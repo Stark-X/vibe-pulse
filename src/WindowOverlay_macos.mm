@@ -1,14 +1,11 @@
 #include "WindowOverlay.h"
 
 #include <QGuiApplication>
-#include <QLoggingCategory>
 #include <QScreen>
 #include <QWindow>
 
 #import <AppKit/AppKit.h>
 #import <objc/runtime.h>
-
-Q_LOGGING_CATEGORY(notchOverlayCat, "pulse.notch.overlay")
 
 // Key for associated object storing hit-test regions on an NSView.
 static const void *kHitTestRegionsKey = &kHitTestRegionsKey;
@@ -81,7 +78,8 @@ static void swizzleConstrainFrameRect(NSWindow *nswin)
     SEL sel = @selector(constrainFrameRect:toScreen:);
     Method m = class_getInstanceMethod(cls, sel);
     if (!m) {
-        qCDebug(notchOverlayCat, "constrainFrameRect not found on %s", [name UTF8String]);
+        FILE *f = fopen("/tmp/notch_swizzle.log", "a");
+        if (f) { fprintf(f, "constrainFrameRect not found on %s\n", [name UTF8String]); fclose(f); }
         return;
     }
 
@@ -95,7 +93,8 @@ static void swizzleConstrainFrameRect(NSWindow *nswin)
         });
     method_setImplementation(m, replacement);
 
-    qCDebug(notchOverlayCat, "Swizzled constrainFrameRect on class: %s", [name UTF8String]);
+    FILE *f = fopen("/tmp/notch_swizzle.log", "a");
+    if (f) { fprintf(f, "Swizzled constrainFrameRect on class: %s\n", [name UTF8String]); fclose(f); }
 }
 
 class MacOSWindowOverlay final : public WindowOverlay {
@@ -180,12 +179,16 @@ public:
         [nswin setLevel: NSScreenSaverWindowLevel];
         [nswin setFrameTopLeftPoint: NSMakePoint(targetX, targetY)];
 
-        NSRect fr = nswin.frame;
-        CGFloat actualTop = fr.origin.y + fr.size.height;
-        qCDebug(notchOverlayCat, "placeNotchHud Qt(%d,%d) AppKit(%.0f,%.0f) level=%ld after topY=%.0f diff=%.0f%s",
-                x, y, targetX, targetY, (long)nswin.level,
-                actualTop, targetY - actualTop,
-                (targetY == actualTop) ? " OK" : " CLAMPED");
+        FILE *f = fopen("/tmp/notch_place.log", "a");
+        if (f) {
+            NSRect fr = nswin.frame;
+            CGFloat actualTop = fr.origin.y + fr.size.height;
+            fprintf(f, "placeNotchHud Qt(%d,%d) AppKit(%.0f,%.0f) level=%ld after topY=%.0f diff=%.0f%s\n",
+                    x, y, targetX, targetY, (long)nswin.level,
+                    actualTop, targetY - actualTop,
+                    (targetY == actualTop) ? " OK" : " CLAMPED");
+            fclose(f);
+        }
     }
 
     void setHitTestRegions(QWindow *win, const QVector<QRectF> &regions) override
