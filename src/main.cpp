@@ -12,7 +12,6 @@
 #include <QQmlContext>
 #include <QQmlEngine>
 #include <QQuickWindow>
-#include <QScreen>
 #include <QTimer>
 
 #include "AgentModel.h"
@@ -25,10 +24,6 @@
 #include "TmuxResolver.h"
 #include "WindowManager.h"
 #include "WindowOverlay.h"
-
-#ifdef Q_OS_MACOS
-#include "NotchGeometry.h"
-#endif
 
 // Build a mock snapshot for UI preview — PULSE_MOCK=<scenario>
 // Scenarios: idle, working, permission, question, plan, expanded
@@ -257,14 +252,6 @@ int main(int argc, char **argv)
     engine.rootContext()->setContextProperty(QStringLiteral("mockForceExpanded"),
         QVariant(mockScenario == QStringLiteral("expanded")));
 
-#ifdef Q_OS_MACOS
-    auto *notchGeo = new NotchGeometry(&app);
-    engine.rootContext()->setContextProperty(QStringLiteral("notchGeometry"), notchGeo);
-#else
-    // Stub: always unavailable on non-macOS
-    engine.rootContext()->setContextProperty(QStringLiteral("notchGeometry"), nullptr);
-#endif
-
     QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/qml/main.qml")),
                              QQmlComponent::PreferSynchronous);
     if (component.isError()) {
@@ -287,89 +274,6 @@ int main(int argc, char **argv)
     component.completeCreate();
     subMon->start();
     window->show();
-
-    // ── Notch HUD windows (macOS only) ────────────────────────────────────────
-    // One pair of HUD windows per screen: leftHUD + rightHUD
-    QVector<QWindow *> hudWindows;
-
-#ifdef Q_OS_MACOS
-    auto createHudWindow = [&](const char *qmlFile, OverlayOptions::Role role) -> QWindow * {
-        QQmlComponent hudComp(&engine, QUrl(QString::fromUtf8("qrc:/qml/%1").arg(qmlFile)));
-        if (hudComp.isError()) {
-            for (const auto &e : hudComp.errors())
-                qWarning().noquote() << e.toString();
-            return nullptr;
-        }
-        QObject *hudRoot = hudComp.beginCreate(engine.rootContext());
-        auto *hudWin = qobject_cast<QWindow *>(hudRoot);
-        if (!hudWin) {
-            qWarning("pulse: %s must be a Window", qmlFile);
-            delete hudRoot;
-            return nullptr;
-        }
-        OverlayOptions hudOpts;
-        hudOpts.role = role;
-        hudOpts.ignoresMouseEvents = true;
-        overlay->setup(hudWin, hudOpts);
-        hudComp.completeCreate();
-        return hudWin;
-    };
-
-    if (notchGeo && notchGeo->available()) {
-        // Create one HUD pair per screen
-        for (const auto &pos : notchGeo->positions()) {
-            // Find matching QScreen
-            QScreen *targetScreen = nullptr;
-            for (auto *screen : QGuiApplication::screens()) {
-                if (screen->name() == pos.screenName) {
-                    targetScreen = screen;
-                    break;
-                }
-            }
-            if (!targetScreen) continue;
-
-            QWindow *leftWin  = createHudWindow("NotchLeftHUD.qml",  OverlayOptions::NotchLeftHud);
-            QWindow *rightWin = createHudWindow("NotchRightHUD.qml", OverlayOptions::NotchRightHud);
-
-            if (leftWin) {
-                leftWin->setScreen(targetScreen);
-                hudWindows.append(leftWin);
-            }
-            if (rightWin) {
-                rightWin->setScreen(targetScreen);
-                hudWindows.append(rightWin);
-            }
-        }
-
-        auto repositionHuds = [=]() {
-            const auto &positions = notchGeo->positions();
-            int idx = 0;
-            for (const auto &pos : positions) {
-                // Each screen has 2 HUDs: left at (idx*2), right at (idx*2+1)
-                QWindow *leftWin  = (idx * 2 + 0 < hudWindows.size()) ? hudWindows[idx * 2 + 0] : nullptr;
-                QWindow *rightWin = (idx * 2 + 1 < hudWindows.size()) ? hudWindows[idx * 2 + 1] : nullptr;
-
-                if (leftWin) {
-                    leftWin->setPosition(static_cast<int>(pos.leftX), static_cast<int>(pos.y));
-                    leftWin->setVisible(model->rowCount() > 0);
-                }
-                if (rightWin) {
-                    rightWin->setPosition(static_cast<int>(pos.rightX), static_cast<int>(pos.y));
-                    rightWin->setVisible(subMon->claudeAvailable());
-                }
-                idx++;
-            }
-        };
-
-        QObject::connect(notchGeo, &NotchGeometry::geometryChanged, window, repositionHuds);
-        QObject::connect(model, &AgentModel::countChanged, window, repositionHuds);
-        QObject::connect(subMon, &SubscriptionMonitor::dataChanged, window, repositionHuds);
-
-        repositionHuds();
-        for (auto *w : hudWindows)
-            w->show();
-    }
-#endif
 
     // On compositors that need external resize IPC (currently Hyprland), use
     // the window manager's resizeWindow to keep the overlay at the correct size
@@ -414,24 +318,19 @@ int main(int argc, char **argv)
     auto *server = new QLocalServer(&app);
     server->listen(serverName);
     QObject::connect(server, &QLocalServer::newConnection, window,
-                     [server, window, hudWindows]() {
+                     [server, window]() {
         QLocalSocket *conn = server->nextPendingConnection();
         QObject::connect(conn, &QLocalSocket::readyRead, window,
-                         [conn, window, hudWindows]() {
+                         [conn, window]() {
             const QByteArray data = conn->readAll();
             QJsonObject obj = QJsonDocument::fromJson(data).object();
             const QString cmd = obj.value(QStringLiteral("cmd")).toString();
-            auto setAllVisible = [&](bool v) {
-                window->setVisible(v);
-                for (auto *w : hudWindows)
-                    w->setVisible(v);
-            };
             if (cmd == QStringLiteral("toggle"))
-                setAllVisible(!window->isVisible());
+                window->setVisible(!window->isVisible());
             else if (cmd == QStringLiteral("show"))
-                setAllVisible(true);
+                window->setVisible(true);
             else if (cmd == QStringLiteral("hide"))
-                setAllVisible(false);
+                window->setVisible(false);
             conn->close();
             conn->deleteLater();
         });
