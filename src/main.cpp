@@ -257,10 +257,6 @@ int main(int argc, char **argv)
     engine.rootContext()->setContextProperty(QStringLiteral("mockForceExpanded"),
         QVariant(mockScenario == QStringLiteral("expanded")));
 
-    // OverlayProxy is exposed to QML for hit-test region updates.
-    auto *overlayProxy = new OverlayProxy(&app);
-    engine.rootContext()->setContextProperty(QStringLiteral("overlayProxy"), overlayProxy);
-
 #ifdef Q_OS_MACOS
     auto *notchGeo = new NotchGeometry(&app);
     engine.rootContext()->setContextProperty(QStringLiteral("notchGeometry"), notchGeo);
@@ -269,17 +265,8 @@ int main(int argc, char **argv)
     engine.rootContext()->setContextProperty(QStringLiteral("notchGeometry"), nullptr);
 #endif
 
-#ifdef Q_OS_MACOS
-    // On macOS, use the fusion notch widget instead of the traditional MainCard.
-    const bool useFusion = notchGeo && notchGeo->available();
-#else
-    const bool useFusion = false;
-#endif
-
-    QQmlComponent component(&engine,
-        QUrl(useFusion ? QStringLiteral("qrc:/qml/NotchFusionWidget.qml")
-                       : QStringLiteral("qrc:/qml/main.qml")),
-        QQmlComponent::PreferSynchronous);
+    QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/qml/main.qml")),
+                             QQmlComponent::PreferSynchronous);
     if (component.isError()) {
         for (const auto &e : component.errors())
             qWarning().noquote() << e.toString();
@@ -295,55 +282,50 @@ int main(int argc, char **argv)
     }
 
     auto overlay = WindowOverlay::create();
-
-    OverlayOptions mainOpts;
-#ifdef Q_OS_MACOS
-    if (useFusion) {
-        mainOpts.role = OverlayOptions::NotchFusionWidget;
-    }
-#endif
-    overlay->setup(window, mainOpts);
-
-    // Wire overlay proxy to QML
-    overlayProxy->overlay = overlay.get();
-    overlayProxy->fusionWindow = window;
+    overlay->setup(window);
 
     component.completeCreate();
     subMon->start();
     window->show();
 
     // ── Notch HUD windows (macOS only) ────────────────────────────────────────
-    // Fusion mode: single NotchFusionWidget replaces MainCard + left/right HUDs.
-    // Legacy mode: separate NotchLeftHUD + NotchRightHUD per screen.
+    // One pair of HUD windows per screen: leftHUD + rightHUD
     QVector<QWindow *> hudWindows;
 
 #ifdef Q_OS_MACOS
-    if (notchGeo && !useFusion) {
-        auto createHudWindow = [&](const char *qmlFile, OverlayOptions::Role role) -> QWindow * {
-            QQmlComponent hudComp(&engine, QUrl(QString::fromUtf8("qrc:/qml/%1").arg(qmlFile)));
-            if (hudComp.isError()) {
-                for (const auto &e : hudComp.errors())
-                    qWarning().noquote() << e.toString();
-                return nullptr;
-            }
-            QObject *hudRoot = hudComp.beginCreate(engine.rootContext());
-            auto *hudWin = qobject_cast<QWindow *>(hudRoot);
-            if (!hudWin) {
-                qWarning("pulse: %s must be a Window", qmlFile);
-                delete hudRoot;
-                return nullptr;
-            }
-            OverlayOptions hudOpts;
-            hudOpts.role = role;
-            hudOpts.ignoresMouseEvents = true;
-            overlay->setup(hudWin, hudOpts);
-            hudComp.completeCreate();
-            return hudWin;
-        };
+    auto createHudWindow = [&](const char *qmlFile, OverlayOptions::Role role) -> QWindow * {
+        QQmlComponent hudComp(&engine, QUrl(QString::fromUtf8("qrc:/qml/%1").arg(qmlFile)));
+        if (hudComp.isError()) {
+            for (const auto &e : hudComp.errors())
+                qWarning().noquote() << e.toString();
+            return nullptr;
+        }
+        QObject *hudRoot = hudComp.beginCreate(engine.rootContext());
+        auto *hudWin = qobject_cast<QWindow *>(hudRoot);
+        if (!hudWin) {
+            qWarning("pulse: %s must be a Window", qmlFile);
+            delete hudRoot;
+            return nullptr;
+        }
+        OverlayOptions hudOpts;
+        hudOpts.role = role;
+        hudOpts.ignoresMouseEvents = true;
+        overlay->setup(hudWin, hudOpts);
+        hudComp.completeCreate();
+        return hudWin;
+    };
 
+    if (notchGeo) {
         WindowOverlay *ovl = overlay.get();
+
+        // hw points to hudWindows (defined above #ifdef Q_OS_MACOS) so the IPC
+        // toggle lambda can also capture it as a raw pointer via [=].
         auto *hw = &hudWindows;
 
+        // Create HUD windows for any screens not yet in hw.
+        // Guarded by a static flag to prevent AppKit notification reentrance:
+        // createHudWindow → NSWindow created → AppKit notification fires →
+        // geometryChanged → repositionHuds → createHudWindows (recursive).
         auto createMissingHudWindows = [&]() {
             static bool creating = false;
             if (creating) return;
@@ -364,12 +346,21 @@ int main(int argc, char **argv)
                 QWindow *rw = createHudWindow("NotchRightHUD.qml", OverlayOptions::NotchRightHud);
                 if (lw) { if (targetScreen) lw->setScreen(targetScreen); lw->show(); hw->append(lw); }
                 if (rw) { if (targetScreen) rw->setScreen(targetScreen); rw->show(); hw->append(rw); }
+
+                FILE *dbg = fopen("/tmp/notch_qtscreens.log", "a");
+                if (dbg) {
+                    fprintf(dbg, "HUD pair %d: screen=%s Qt screen=%s\n", i,
+                            pos.screenName.toUtf8().constData(),
+                            targetScreen ? targetScreen->name().toUtf8().constData() : "(none)");
+                    fclose(dbg);
+                }
             }
             creating = false;
         };
 
         createMissingHudWindows();
 
+        // repositionHuds uses [=] capturing raw pointers — safe, no [&] dangling risk.
         auto repositionHuds = [=]() {
             const auto &positions = notchGeo->positions();
             for (int idx = 0; idx < positions.size(); ++idx) {
@@ -392,36 +383,18 @@ int main(int argc, char **argv)
         QObject::connect(model, &AgentModel::countChanged, window, repositionHuds);
         QObject::connect(subMon, &SubscriptionMonitor::dataChanged, window, repositionHuds);
 
+        // Screen added after startup (MacBook lid opened, display connected, etc.)
         QObject::connect(static_cast<QGuiApplication *>(QGuiApplication::instance()),
                          &QGuiApplication::screenAdded, window,
                          [notchGeo](QScreen *) { notchGeo->refresh(); });
 
+        // Position after QML show events settle (0ms), and again at 1s for
+        // MacBook screen that appears after app startup notification flood.
         QTimer::singleShot(0,    window, repositionHuds);
         QTimer::singleShot(1000, window, [notchGeo, createMissingHudWindows, repositionHuds]() {
             notchGeo->refresh();
             createMissingHudWindows();
             repositionHuds();
-        });
-    } else if (notchGeo && useFusion) {
-        // Fusion mode: position the single NotchFusionWidget window
-        WindowOverlay *ovl = overlay.get();
-        auto repositionFusion = [=]() {
-            const auto &positions = notchGeo->positions();
-            if (positions.isEmpty()) return;
-            const auto &pos = positions[0];
-            ovl->placeFusionWindow(window, pos.screenX, pos.y, pos.screenWidth);
-        };
-
-        QObject::connect(notchGeo, &NotchGeometry::geometryChanged, window, repositionFusion);
-
-        QObject::connect(static_cast<QGuiApplication *>(QGuiApplication::instance()),
-                         &QGuiApplication::screenAdded, window,
-                         [notchGeo](QScreen *) { notchGeo->refresh(); });
-
-        QTimer::singleShot(0,    window, repositionFusion);
-        QTimer::singleShot(1000, window, [notchGeo, repositionFusion]() {
-            notchGeo->refresh();
-            repositionFusion();
         });
     }
 #endif
@@ -469,19 +442,17 @@ int main(int argc, char **argv)
     auto *server = new QLocalServer(&app);
     server->listen(serverName);
     QObject::connect(server, &QLocalServer::newConnection, window,
-                     [server, window, &hudWindows, useFusion]() {
+                     [server, window, &hudWindows]() {
         QLocalSocket *conn = server->nextPendingConnection();
         QObject::connect(conn, &QLocalSocket::readyRead, window,
-                         [conn, window, &hudWindows, useFusion]() {
+                         [conn, window, &hudWindows]() {
             const QByteArray data = conn->readAll();
             QJsonObject obj = QJsonDocument::fromJson(data).object();
             const QString cmd = obj.value(QStringLiteral("cmd")).toString();
             auto setAllVisible = [&](bool v) {
                 window->setVisible(v);
-                if (!useFusion) {
-                    for (auto *w : hudWindows)
-                        w->setVisible(v);
-                }
+                for (auto *w : hudWindows)
+                    w->setVisible(v);
             };
             if (cmd == QStringLiteral("toggle"))
                 setAllVisible(!window->isVisible());

@@ -145,7 +145,6 @@ qt_add_resources(pulse pulse_qml
         qml/Keycap.qml
         qml/NotchLeftHUD.qml
         qml/NotchRightHUD.qml
-        qml/NotchFusionWidget.qml
         assets/claude-code.png
         assets/codex.png
 )

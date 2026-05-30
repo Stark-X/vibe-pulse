@@ -11,14 +11,6 @@ struct ScreenHudPos {
     qreal rightX  = 0;    // X position for right HUD (usage gauge)
     qreal y       = 0;    // Y position for both HUDs
     bool  hasNotch = false;
-
-    // Fusion widget geometry
-    qreal screenWidth   = 0;  // Screen width in Qt logical points
-    qreal safeTop       = 0;  // safeAreaInsets.top
-    qreal leftAreaWidth = 0;  // auxiliaryTopLeftArea.width
-    qreal rightAreaWidth = 0; // auxiliaryTopRightArea.width
-    qreal notchLeftX    = 0;  // X of notch left edge (= screenX + leftAreaWidth)
-    qreal notchRightX   = 0;  // X of notch right edge (= screenX + screenWidth - rightAreaWidth)
 };
 
 class NotchGeometry : public QObject
