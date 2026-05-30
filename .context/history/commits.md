@@ -1,5 +1,12 @@
 # Commit History
 
+## 2026-05-30 — docs(ai-context): 初始化全模块 CLAUDE.md AI 上下文文档
+**Decisions:**
+- init-architect 子智能体扫描 62 文件（覆盖 84%），按「根级简明 + 模块级详尽」策略生成文档
+- 根级 CLAUDE.md 包含完整架构图、状态机、Mermaid 模块图、模块索引、开发命令、AI 使用指引
+- 模块级文档覆盖 src/、qml/、pulse-toggle/、openspec/ 四个模块
+- .claude/index.json 新建为模块导航索引
+
 ## 2026-05-13 — fix(pulse): read Codex session name from session_index.jsonl
 **Decisions:**
 - Extract session ID from JSONL filename (rollout-<ts>-<UUID>.jsonl) instead of parsing first line — avoids 22KB+ line read and is resilient to future file format changes

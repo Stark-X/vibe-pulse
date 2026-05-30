@@ -1,0 +1,92 @@
+{
+  "scanned_at": "2026-05-30T00:00:00Z",
+  "truncated": false,
+  "coverage": {
+    "estimated_total_files": 62,
+    "scanned_files": 52,
+    "coverage_pct": 84
+  },
+  "ignored_dirs": [
+    "build/ (CMake build artifacts)",
+    "build_mac/ (CMake build artifacts, macOS)",
+    ".git/ (git internals)",
+    "*.lock, *.log, *.bin, *.png (binary/lock files)"
+  ],
+  "modules": [
+    {
+      "name": "src",
+      "path": "src/",
+      "language": "C++17",
+      "entry": "src/main.cpp",
+      "doc": "src/CLAUDE.md",
+      "key_interfaces": [
+        "AgentModel (QAbstractListModel) — context property 'agentModel'",
+        "ResponseWriter::writeQuestionAnswer / writePlanDecision / writePermissionDecision",
+        "WindowManager::create() — platform factory",
+        "ProcessTree — cross-platform process info",
+        "ClaudeMetaReader::read(pid, cwd) — JSONL parser",
+        "QLocalServer('pulse-ipc') — toggle/show/hide IPC"
+      ],
+      "data_model": "AgentInfo struct (AgentInfo.h), PulseState enum (Idle/Working/Permission/Question/Plan)",
+      "platform_files": {
+        "linux": ["ProcessTree_linux.cpp", "WindowOverlay_linux.cpp", "HyprlandWindowManager.cpp", "WaylandLayerShell.cpp", "TmuxResolver.cpp"],
+        "macos": ["ProcessTree_macos.cpp", "WindowOverlay_macos.mm", "MacOSWindowManager.mm"],
+        "windows": ["ProcessTree_win.cpp", "WindowOverlay_win.cpp", "TmuxResolver_win.cpp"]
+      },
+      "coverage_gaps": ["no automated tests", "CodexMetaReader internals not fully read"]
+    },
+    {
+      "name": "qml",
+      "path": "qml/",
+      "language": "QML (Qt Quick)",
+      "entry": "qml/main.qml",
+      "doc": "qml/CLAUDE.md",
+      "key_interfaces": [
+        "Theme singleton — colors, shape, agentAccent(name)",
+        "agentModel.answerQuestion / approvePlan / commentPlan / decidePermission",
+        "agentModel.focusAgent(index)",
+        "appSettings.theme / shape"
+      ],
+      "components": ["main.qml", "HeaderBar.qml", "ExpandedView.qml", "PermissionView.qml", "QuestionView.qml", "PlanView.qml", "AgentRow.qml", "Theme.qml", "Keycap.qml"],
+      "coverage_gaps": []
+    },
+    {
+      "name": "pulse-toggle",
+      "path": "pulse-toggle/",
+      "language": "C++",
+      "entry": "pulse-toggle/main.cpp",
+      "doc": "pulse-toggle/CLAUDE.md",
+      "key_interfaces": ["QLocalSocket('pulse-ipc') — sends JSON {cmd: toggle|show|hide}"],
+      "coverage_gaps": []
+    },
+    {
+      "name": "openspec",
+      "path": "openspec/",
+      "language": "Markdown",
+      "entry": "openspec/changes/",
+      "doc": "openspec/CLAUDE.md",
+      "changes": [
+        {"name": "cross-platform-support", "status": "phases 1-9 complete, 10.5/10.6/11.9/11.10 pending real-device verification"},
+        {"name": "agent-permission-inline-actions", "status": "pending"},
+        {"name": "agent-row-ui-enhancement", "status": "pending"},
+        {"name": "context-usage-indicator", "status": "pending"},
+        {"name": "header-subscription-usage", "status": "pending"},
+        {"name": "tmux-pane-focus-on-click", "status": "pending"},
+        {"name": "pulse-subtitle-realtime-update", "status": "proposal only"},
+        {"name": "agent-monitor-real-integration", "status": "archived (historical Tauri spec)"}
+      ],
+      "coverage_gaps": []
+    }
+  ],
+  "gaps": [
+    "No automated test suite — all quality verification via mock scenarios and manual testing",
+    "Windows platform build verification pending (no Windows CI)",
+    "macOS real-device build verification pending for some cross-platform phases",
+    "CodexMetaReader.cpp not fully read (JSONL parsing details for Codex)"
+  ],
+  "next_scan_priority": [
+    "src/CodexMetaReader.cpp — Codex session parsing details",
+    "src/ProcScanner.cpp — exact process detection rules (claude/codex/opencode comm matching)",
+    "src/AgentModel.cpp — globalState computation logic"
+  ]
+}
