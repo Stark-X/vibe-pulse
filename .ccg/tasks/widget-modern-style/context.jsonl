@@ -1,0 +1,5 @@
+{"_example": "Fill with {\"file\": \"path\", \"reason\": \"why\"}. Seed rows are skipped."}
+{"file": "qml/main.qml", "reason": "主窗口，dot/collapsed 状态卡片定义"}
+{"file": "qml/HeaderBar.qml", "reason": "展开状态标题栏，含状态指示、用量显示"}
+{"file": "qml/Theme.qml", "reason": "Singleton 主题，颜色/间距/形状 token"}
+{"file": "qml/ExpandedView.qml", "reason": "展开列表视图"}

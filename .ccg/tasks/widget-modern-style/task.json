@@ -1,0 +1,12 @@
+{
+  "id": "widget-modern-style",
+  "title": "Update widget initial interface to modern style",
+  "status": "in_progress",
+  "strategy": "guided-develop",
+  "currentPhase": "6-verify",
+  "nextAction": "用户视觉验证 mock 场景，确认后归档",
+  "gate": null,
+  "branch": "master",
+  "scope": "widget-modern-style",
+  "createdAt": "2026-05-30T09:47:32Z"
+}

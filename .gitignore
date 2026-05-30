@@ -507,3 +507,4 @@ src-tauri/openspec/
 !/Makefile
 .claude/worktrees
 build_mac/
+.antigravitycli
